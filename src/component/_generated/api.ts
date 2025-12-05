@@ -9,6 +9,7 @@
  */
 
 import type * as check from "../check.js";
+import type * as permissions from "../permissions.js";
 import type * as tuples from "../tuples.js";
 
 import type {
@@ -20,6 +21,7 @@ import { anyApi, componentsGeneric } from "convex/server";
 
 const fullApi: ApiFromModules<{
   check: typeof check;
+  permissions: typeof permissions;
   tuples: typeof tuples;
 }> = anyApi as any;
 

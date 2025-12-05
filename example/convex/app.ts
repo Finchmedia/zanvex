@@ -442,6 +442,81 @@ export const getAllTuples = query({
 });
 
 // ============================================
+// PERMISSION SCHEMA MANAGEMENT
+// ============================================
+
+/**
+ * Initialize default permission schema
+ * Call this once to set up:
+ *   admin_of → ["create", "read", "update", "delete"]
+ *   member_of → ["read"]
+ */
+export const initializePermissions = mutation({
+  args: {},
+  handler: async (ctx) => {
+    await zanvex.initializeDefaults(ctx);
+  },
+});
+
+/**
+ * List all permission schemas
+ */
+export const listPermissionSchemas = query({
+  args: {},
+  handler: async (ctx) => {
+    return await zanvex.listPermissions(ctx);
+  },
+});
+
+/**
+ * Update permissions for a relation
+ */
+export const updatePermissionSchema = mutation({
+  args: {
+    relation: v.string(),
+    actions: v.array(v.string()),
+  },
+  handler: async (ctx, { relation, actions }) => {
+    await zanvex.setPermissions(ctx, relation, actions);
+  },
+});
+
+/**
+ * Get permissions a user has on a resource
+ * Returns { create, read, update, delete } booleans
+ */
+export const getResourcePermissions = query({
+  args: {
+    userId: v.id("users"),
+    resourceId: v.id("resources"),
+  },
+  handler: async (ctx, { userId, resourceId }) => {
+    return await zanvex.getPermissionsForObject(ctx, {
+      subject: { type: "user", id: userId },
+      object: { type: "resource", id: resourceId },
+    });
+  },
+});
+
+/**
+ * Check if user can perform specific action on resource
+ */
+export const canUserDoAction = query({
+  args: {
+    userId: v.id("users"),
+    resourceId: v.id("resources"),
+    action: v.string(),
+  },
+  handler: async (ctx, { userId, resourceId, action }) => {
+    return await zanvex.can(ctx, {
+      subject: { type: "user", id: userId },
+      action,
+      object: { type: "resource", id: resourceId },
+    });
+  },
+});
+
+// ============================================
 // RESET
 // ============================================
 

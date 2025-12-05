@@ -37,67 +37,135 @@ export const check = query({
   },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    // Step 1: Direct check - does the exact tuple exist?
-    const direct = await ctx.db
+    const result = await checkWithPathInternal(ctx, args);
+    return result.granted;
+  },
+});
+
+/**
+ * Check with path - returns HOW access was granted
+ *
+ * This is the key for permission schemas: we need to know
+ * not just IF access exists, but WHAT RELATION granted it.
+ *
+ * Example return:
+ *   {
+ *     granted: true,
+ *     direct: false,
+ *     relation: "admin_of",  // The relation that granted access
+ *     via: { type: "org", id: "acme" }  // The intermediate entity
+ *   }
+ */
+export const checkWithPath = query({
+  args: {
+    objectType: v.string(),
+    objectId: v.string(),
+    relation: v.string(),
+    subjectType: v.string(),
+    subjectId: v.string(),
+  },
+  returns: v.object({
+    granted: v.boolean(),
+    direct: v.boolean(),
+    relation: v.optional(v.string()),
+    via: v.optional(
+      v.object({
+        type: v.string(),
+        id: v.string(),
+      })
+    ),
+  }),
+  handler: async (ctx, args) => {
+    return await checkWithPathInternal(ctx, args);
+  },
+});
+
+// Internal helper to avoid code duplication
+async function checkWithPathInternal(
+  ctx: any,
+  args: {
+    objectType: string;
+    objectId: string;
+    relation: string;
+    subjectType: string;
+    subjectId: string;
+  }
+): Promise<{
+  granted: boolean;
+  direct: boolean;
+  relation?: string;
+  via?: { type: string; id: string };
+}> {
+  // Step 1: Direct check - does the exact tuple exist?
+  const direct = await ctx.db
+    .query("relations")
+    .withIndex("by_tuple", (q: any) =>
+      q
+        .eq("objectType", args.objectType)
+        .eq("objectId", args.objectId)
+        .eq("relation", args.relation)
+        .eq("subjectType", args.subjectType)
+        .eq("subjectId", args.subjectId)
+    )
+    .first();
+
+  if (direct) {
+    return {
+      granted: true,
+      direct: true,
+      relation: args.relation,
+    };
+  }
+
+  // Step 2: 1-hop traversal
+  // Find all groups/orgs the subject is a member of
+  const allRelations = await ctx.db
+    .query("relations")
+    .withIndex("by_subject", (q: any) =>
+      q.eq("subjectType", args.subjectType).eq("subjectId", args.subjectId)
+    )
+    .collect();
+
+  const memberships = allRelations.filter(
+    (t: any) =>
+      t.relation === "member_of" ||
+      t.relation === "admin_of" ||
+      t.relation === "editor" ||
+      t.relation === "viewer"
+  );
+
+  // Step 3: Check if any membership grants access
+  for (const membership of memberships) {
+    const indirect = await ctx.db
       .query("relations")
-      .withIndex("by_tuple", (q) =>
+      .withIndex("by_tuple", (q: any) =>
         q
           .eq("objectType", args.objectType)
           .eq("objectId", args.objectId)
           .eq("relation", args.relation)
-          .eq("subjectType", args.subjectType)
-          .eq("subjectId", args.subjectId)
+          .eq("subjectType", membership.objectType)
+          .eq("subjectId", membership.objectId)
       )
       .first();
 
-    if (direct) {
-      return true;
+    if (indirect) {
+      return {
+        granted: true,
+        direct: false,
+        relation: membership.relation, // "admin_of" or "member_of" etc.
+        via: {
+          type: membership.objectType,
+          id: membership.objectId,
+        },
+      };
     }
+  }
 
-    // Step 2: 1-hop traversal
-    // Find all groups/orgs the subject is a member of
-    // Looking for tuples like (org:acme, member_of, user:daniel)
-    // Also includes admin_of, editor, viewer, etc. - any relation to a parent
-    const allRelations = await ctx.db
-      .query("relations")
-      .withIndex("by_subject", (q) =>
-        q
-          .eq("subjectType", args.subjectType)
-          .eq("subjectId", args.subjectId)
-      )
-      .collect();
-
-    const memberships = allRelations.filter(
-      (t) =>
-        t.relation === "member_of" ||
-        t.relation === "admin_of" ||
-        t.relation === "editor" ||
-        t.relation === "viewer"
-    );
-
-    // Step 3: Check if any membership grants access
-    // For each org the user belongs to, check if THAT org has the relation
-    for (const membership of memberships) {
-      const indirect = await ctx.db
-        .query("relations")
-        .withIndex("by_tuple", (q) =>
-          q
-            .eq("objectType", args.objectType)
-            .eq("objectId", args.objectId)
-            .eq("relation", args.relation)
-            .eq("subjectType", membership.objectType)
-            .eq("subjectId", membership.objectId)
-        )
-        .first();
-
-      if (indirect) {
-        return true;
-      }
-    }
-
-    return false;
-  },
-});
+  return {
+    granted: false,
+    direct: false,
+  };
+}
 
 /**
  * List all subjects that have a specific relation to an object

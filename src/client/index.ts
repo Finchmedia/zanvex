@@ -220,6 +220,124 @@ export function createZanvexClient(component: ComponentApi) {
     clearAll: (ctx: MutationCtx) => {
       return ctx.runMutation(component.tuples.clearAll, {});
     },
+
+    // ============================================
+    // PERMISSION SCHEMA MANAGEMENT
+    // ============================================
+
+    /**
+     * Set what actions a relation grants
+     *
+     * @example
+     * // Admins can do everything
+     * await zanvex.setPermissions(ctx, "admin_of", ["create", "read", "update", "delete"]);
+     *
+     * // Members can only read
+     * await zanvex.setPermissions(ctx, "member_of", ["read"]);
+     */
+    setPermissions: (ctx: MutationCtx, relation: string, actions: string[]) => {
+      return ctx.runMutation(component.permissions.setPermissions, {
+        relation,
+        actions,
+      });
+    },
+
+    /**
+     * Get permissions for a relation
+     */
+    getPermissions: (ctx: QueryCtx, relation: string) => {
+      return ctx.runQuery(component.permissions.getPermissions, { relation });
+    },
+
+    /**
+     * List all permission schemas
+     */
+    listPermissions: (ctx: QueryCtx) => {
+      return ctx.runQuery(component.permissions.listPermissions, {});
+    },
+
+    /**
+     * Delete a permission schema
+     */
+    deletePermissions: (ctx: MutationCtx, relation: string) => {
+      return ctx.runMutation(component.permissions.deletePermissions, {
+        relation,
+      });
+    },
+
+    /**
+     * Initialize default permissions (admin_of, member_of)
+     *
+     * Call once to set up sensible defaults
+     */
+    initializeDefaults: (ctx: MutationCtx) => {
+      return ctx.runMutation(component.permissions.initializeDefaults, {});
+    },
+
+    // ============================================
+    // THE MAGIC: ACTION-BASED PERMISSION CHECKS
+    // ============================================
+
+    /**
+     * Check if a subject can perform an action on an object
+     *
+     * This is the main API for permission checks!
+     *
+     * @example
+     * // Can daniel delete this resource?
+     * const result = await zanvex.can(ctx, {
+     *   subject: { type: "user", id: "daniel" },
+     *   action: "delete",
+     *   object: { type: "resource", id: "studio-a" },
+     * });
+     *
+     * if (!result.allowed) {
+     *   throw new Error(`Forbidden: ${result.reason}`);
+     * }
+     */
+    can: (
+      ctx: QueryCtx,
+      args: {
+        subject: SubjectRef;
+        action: string;
+        object: ObjectRef;
+      }
+    ) => {
+      return ctx.runQuery(component.permissions.can, {
+        objectType: args.object.type,
+        objectId: args.object.id,
+        action: args.action,
+        subjectType: args.subject.type,
+        subjectId: args.subject.id,
+      });
+    },
+
+    /**
+     * Get all permissions a subject has on an object
+     *
+     * Returns { create, read, update, delete } booleans
+     *
+     * @example
+     * const perms = await zanvex.getPermissionsForObject(ctx, {
+     *   subject: { type: "user", id: "daniel" },
+     *   object: { type: "resource", id: "studio-a" },
+     * });
+     * // { create: true, read: true, update: true, delete: true, relation: "admin_of" }
+     */
+    getPermissionsForObject: (
+      ctx: QueryCtx,
+      args: {
+        subject: SubjectRef;
+        object: ObjectRef;
+      }
+    ) => {
+      return ctx.runQuery(component.permissions.getPermissionsForObject, {
+        objectType: args.object.type,
+        objectId: args.object.id,
+        subjectType: args.subject.type,
+        subjectId: args.subject.id,
+      });
+    },
   };
 }
 

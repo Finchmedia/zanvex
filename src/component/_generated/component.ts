@@ -37,6 +37,24 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         boolean,
         Name
       >;
+      checkWithPath: FunctionReference<
+        "query",
+        "internal",
+        {
+          objectId: string;
+          objectType: string;
+          relation: string;
+          subjectId: string;
+          subjectType: string;
+        },
+        {
+          direct: boolean;
+          granted: boolean;
+          relation?: string;
+          via?: { id: string; type: string };
+        },
+        Name
+      >;
       listRelations: FunctionReference<
         "query",
         "internal",
@@ -56,6 +74,74 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "internal",
         { objectId: string; objectType: string },
         Array<{ relation: string; subjectId: string; subjectType: string }>,
+        Name
+      >;
+    };
+    permissions: {
+      can: FunctionReference<
+        "query",
+        "internal",
+        {
+          action: string;
+          objectId: string;
+          objectType: string;
+          subjectId: string;
+          subjectType: string;
+        },
+        { allowed: boolean; reason?: string; relation?: string },
+        Name
+      >;
+      deletePermissions: FunctionReference<
+        "mutation",
+        "internal",
+        { relation: string },
+        boolean,
+        Name
+      >;
+      getPermissions: FunctionReference<
+        "query",
+        "internal",
+        { relation: string },
+        { actions: Array<string>; relation: string } | null,
+        Name
+      >;
+      getPermissionsForObject: FunctionReference<
+        "query",
+        "internal",
+        {
+          objectId: string;
+          objectType: string;
+          subjectId: string;
+          subjectType: string;
+        },
+        {
+          create: boolean;
+          delete: boolean;
+          read: boolean;
+          relation?: string;
+          update: boolean;
+        },
+        Name
+      >;
+      initializeDefaults: FunctionReference<
+        "mutation",
+        "internal",
+        {},
+        null,
+        Name
+      >;
+      listPermissions: FunctionReference<
+        "query",
+        "internal",
+        {},
+        Array<{ actions: Array<string>; relation: string }>,
+        Name
+      >;
+      setPermissions: FunctionReference<
+        "mutation",
+        "internal",
+        { actions: Array<string>; relation: string },
+        string,
         Name
       >;
     };

@@ -23,8 +23,11 @@ import {
   Database,
   GitBranch,
   Shield,
+  Settings,
+  RefreshCw,
 } from "lucide-react";
 import { Id } from "../convex/_generated/dataModel";
+import { useEffect } from "react";
 
 function TestHarness() {
   // Form inputs
@@ -55,7 +58,18 @@ function TestHarness() {
   // Queries - Zanvex Tuples
   const allTuples = useQuery(api.app.getAllTuples) ?? [];
 
-  // Queries - Permission Checks
+  // Queries - Permission Schema
+  const permissionSchemas = useQuery(api.app.listPermissionSchemas) ?? [];
+
+  // Queries - Resource Permissions (NEW!)
+  const resourcePermissions = useQuery(
+    api.app.getResourcePermissions,
+    selectedUserId && selectedResourceId
+      ? { userId: selectedUserId, resourceId: selectedResourceId }
+      : "skip"
+  );
+
+  // Queries - Permission Checks (legacy)
   const canManageResource = useQuery(
     api.app.canUserManageResource,
     selectedUserId && selectedResourceId
@@ -85,6 +99,15 @@ function TestHarness() {
   const addUserToOrg = useMutation(api.app.addUserToOrg);
   const removeUserFromOrg = useMutation(api.app.removeUserFromOrg);
   const clearAll = useMutation(api.app.clearAll);
+  const initializePermissions = useMutation(api.app.initializePermissions);
+  const updatePermissionSchema = useMutation(api.app.updatePermissionSchema);
+
+  // Initialize permissions on first load
+  useEffect(() => {
+    if (permissionSchemas.length === 0) {
+      initializePermissions();
+    }
+  }, [permissionSchemas.length, initializePermissions]);
 
   // Handlers
   const handleCreateUser = async () => {
@@ -608,6 +631,60 @@ function TestHarness() {
           </Card>
         </div>
 
+        {/* Resource Permissions Card - THE NEW MAGIC! */}
+        {selectedUserId && selectedResourceId && (
+          <Card className="mt-4 border-2 border-primary">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Shield className="size-4" />
+                Resource Permissions
+                {resourcePermissions?.relation && (
+                  <span className="text-xs font-normal bg-primary/20 px-2 py-0.5 rounded">
+                    via {resourcePermissions.relation}
+                  </span>
+                )}
+              </CardTitle>
+              <CardDescription>
+                What can{" "}
+                {users.find((u) => u._id === selectedUserId)?.name ?? "user"} do
+                with{" "}
+                {resources.find((r) => r._id === selectedResourceId)?.name ??
+                  "resource"}
+                ?
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-4 gap-4">
+                {(["create", "read", "update", "delete"] as const).map(
+                  (action) => {
+                    const allowed =
+                      resourcePermissions?.[action as keyof typeof resourcePermissions];
+                    return (
+                      <div
+                        key={action}
+                        className={`flex flex-col items-center p-3 rounded-lg border-2 ${
+                          allowed
+                            ? "border-green-500 bg-green-500/10"
+                            : "border-destructive/50 bg-destructive/5"
+                        }`}
+                      >
+                        {allowed ? (
+                          <Check className="size-6 text-green-500 mb-1" />
+                        ) : (
+                          <X className="size-6 text-destructive mb-1" />
+                        )}
+                        <span className="text-sm font-medium capitalize">
+                          {action}
+                        </span>
+                      </div>
+                    );
+                  }
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Traversal Explanation */}
         {selectedUserId && selectedResourceId && (
           <Card className="mt-4">
@@ -638,6 +715,81 @@ function TestHarness() {
             </CardContent>
           </Card>
         )}
+      </section>
+
+      {/* Section 4: Permission Schema Editor */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Settings className="size-5" />
+          <h2 className="text-xl font-semibold">Permission Schema</h2>
+          <span className="text-muted-foreground text-sm">
+            (Define what each relation can do)
+          </span>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Relation → Actions</CardTitle>
+            <CardDescription>
+              Click actions to toggle. Changes are saved immediately.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {permissionSchemas.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-muted-foreground mb-2">
+                    No permission schema defined
+                  </p>
+                  <Button size="sm" onClick={() => initializePermissions()}>
+                    <RefreshCw className="size-4 mr-2" />
+                    Initialize Defaults
+                  </Button>
+                </div>
+              ) : (
+                permissionSchemas.map((schema) => (
+                  <div
+                    key={schema.relation}
+                    className="flex items-center gap-4 p-3 bg-secondary rounded-lg"
+                  >
+                    <span className="font-mono font-medium text-sm w-24">
+                      {schema.relation}
+                    </span>
+                    <ArrowRight className="size-4 text-muted-foreground" />
+                    <div className="flex gap-2">
+                      {(["create", "read", "update", "delete"] as const).map(
+                        (action) => {
+                          const isEnabled = schema.actions.includes(action);
+                          return (
+                            <button
+                              key={action}
+                              onClick={() => {
+                                const newActions = isEnabled
+                                  ? schema.actions.filter((a) => a !== action)
+                                  : [...schema.actions, action];
+                                updatePermissionSchema({
+                                  relation: schema.relation,
+                                  actions: newActions,
+                                });
+                              }}
+                              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                                isEnabled
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                              }`}
+                            >
+                              {action}
+                            </button>
+                          );
+                        }
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </section>
 
       {/* Clear All */}

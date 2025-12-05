@@ -41,4 +41,25 @@ export default defineSchema({
       "subjectType",
       "subjectId",
     ]),
+
+  /**
+   * Permission Schema
+   *
+   * Defines what actions each relation grants.
+   * This is the "policy" that determines what admin_of vs member_of can do.
+   *
+   * Example:
+   *   { relation: "admin_of", actions: ["create", "read", "update", "delete"] }
+   *   { relation: "member_of", actions: ["read"] }
+   *
+   * When checking `can(user, "delete", resource)`:
+   *   1. Find path: user → admin_of → org → owner → resource
+   *   2. Look up "admin_of" in this table
+   *   3. Check if "delete" is in actions array
+   *   4. Return true/false
+   */
+  permission_schema: defineTable({
+    relation: v.string(), // "admin_of", "member_of", "editor", "viewer"
+    actions: v.array(v.string()), // ["create", "read", "update", "delete"]
+  }).index("by_relation", ["relation"]),
 });
