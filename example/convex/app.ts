@@ -406,6 +406,19 @@ export const getAllTuples = query({
       subject: string;
     }> = [];
 
+    // Helper to resolve subject to human-readable name
+    const resolveSubject = (subjectType: string, subjectId: string) => {
+      if (subjectType === "user") {
+        const user = users.find((u) => u._id === subjectId);
+        return `user:${user?.name ?? subjectId}`;
+      }
+      if (subjectType === "org") {
+        const org = orgs.find((o) => o._id === subjectId);
+        return `org:${org?.name ?? subjectId}`;
+      }
+      return `${subjectType}:${subjectId}`;
+    };
+
     // Get tuples for each org
     for (const org of orgs) {
       const tuples = await zanvex.listTuplesForObject(ctx, {
@@ -416,7 +429,7 @@ export const getAllTuples = query({
         allTuples.push({
           object: `org:${org.name}`,
           relation: t.relation,
-          subject: `${t.subjectType}:${t.subjectId}`,
+          subject: resolveSubject(t.subjectType, t.subjectId),
         });
       }
     }
@@ -428,11 +441,10 @@ export const getAllTuples = query({
         id: resource._id,
       });
       for (const t of tuples) {
-        const org = orgs.find((o) => o._id === t.subjectId);
         allTuples.push({
           object: `resource:${resource.name}`,
           relation: t.relation,
-          subject: `${t.subjectType}:${org?.name ?? t.subjectId}`,
+          subject: resolveSubject(t.subjectType, t.subjectId),
         });
       }
     }
