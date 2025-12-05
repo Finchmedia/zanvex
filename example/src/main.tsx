@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexQueryCacheProvider } from "convex-helpers/react/cache";
 import App from "./App";
 import "./index.css";
 
@@ -15,7 +16,9 @@ const convex = new ConvexReactClient(address);
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ConvexProvider client={convex}>
-      <App />
+      <ConvexQueryCacheProvider>
+        <App />
+      </ConvexQueryCacheProvider>
     </ConvexProvider>
   </StrictMode>,
 );
