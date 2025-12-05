@@ -26,8 +26,13 @@ import type { ComponentApi } from "../component/_generated/component.js";
  * ```
  */
 
-type QueryCtx = GenericQueryCtx<GenericDataModel>;
-type MutationCtx = GenericMutationCtx<GenericDataModel>;
+/**
+ * We use `any` here to allow the client to work with any app schema.
+ * The component operates on generic tuple data and doesn't need to
+ * know about the app's specific table schema.
+ */
+type QueryCtx = GenericQueryCtx<any>;
+type MutationCtx = GenericMutationCtx<any>;
 
 export interface ObjectRef {
   type: string;
