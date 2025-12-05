@@ -57,15 +57,23 @@ export const check = query({
     // Step 2: 1-hop traversal
     // Find all groups/orgs the subject is a member of
     // Looking for tuples like (org:acme, member_of, user:daniel)
-    const memberships = await ctx.db
+    // Also includes admin_of, editor, viewer, etc. - any relation to a parent
+    const allRelations = await ctx.db
       .query("relations")
       .withIndex("by_subject", (q) =>
         q
           .eq("subjectType", args.subjectType)
           .eq("subjectId", args.subjectId)
-          .eq("relation", "member_of")
       )
       .collect();
+
+    const memberships = allRelations.filter(
+      (t) =>
+        t.relation === "member_of" ||
+        t.relation === "admin_of" ||
+        t.relation === "editor" ||
+        t.relation === "viewer"
+    );
 
     // Step 3: Check if any membership grants access
     // For each org the user belongs to, check if THAT org has the relation
