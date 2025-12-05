@@ -1,0 +1,476 @@
+/**
+ * App Layer - Test Harness
+ *
+ * These mutations simulate what a real app would do:
+ * 1. Create data in app tables (users, orgs, resources)
+ * 2. Sync relationships to Zanvex tuples
+ *
+ * This demonstrates the "dual-write" pattern where your app
+ * maintains its own data AND mirrors permissions to Zanvex.
+ */
+import { mutation, query } from "./_generated/server.js";
+import { components } from "./_generated/api.js";
+import { createZanvexClient } from "@mrfinch/zanvex";
+import { v } from "convex/values";
+
+const zanvex = createZanvexClient(components.zanvex);
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+/**
+ * Create a user in the app
+ * (No Zanvex tuple needed - users are just entities)
+ */
+export const createUser = mutation({
+  args: {
+    name: v.string(),
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const id = await ctx.db.insert("users", args);
+    return id;
+  },
+});
+
+/**
+ * List all users
+ */
+export const listUsers = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("users").collect();
+  },
+});
+
+/**
+ * Delete a user and clean up Zanvex tuples
+ */
+export const deleteUser = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    // Remove from org_members
+    const memberships = await ctx.db
+      .query("org_members")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    for (const m of memberships) {
+      await ctx.db.delete(m._id);
+    }
+
+    // Remove all Zanvex tuples for this user
+    await zanvex.removeAllForSubject(ctx, { type: "user", id: userId });
+
+    // Delete user
+    await ctx.db.delete(userId);
+  },
+});
+
+// ============================================
+// ORG MANAGEMENT
+// ============================================
+
+/**
+ * Create an organization
+ * (No Zanvex tuple needed - orgs are just entities)
+ */
+export const createOrg = mutation({
+  args: {
+    name: v.string(),
+    slug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const id = await ctx.db.insert("orgs", args);
+    return id;
+  },
+});
+
+/**
+ * List all orgs
+ */
+export const listOrgs = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("orgs").collect();
+  },
+});
+
+/**
+ * Delete an org and clean up everything
+ */
+export const deleteOrg = mutation({
+  args: { orgId: v.id("orgs") },
+  handler: async (ctx, { orgId }) => {
+    // Remove all memberships
+    const memberships = await ctx.db
+      .query("org_members")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+
+    for (const m of memberships) {
+      await ctx.db.delete(m._id);
+    }
+
+    // Remove all resources
+    const resources = await ctx.db
+      .query("resources")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+
+    for (const r of resources) {
+      await zanvex.removeAllForObject(ctx, { type: "resource", id: r._id });
+      await ctx.db.delete(r._id);
+    }
+
+    // Remove all Zanvex tuples for this org
+    await zanvex.removeAllForObject(ctx, { type: "org", id: orgId });
+
+    // Delete org
+    await ctx.db.delete(orgId);
+  },
+});
+
+// ============================================
+// ORG MEMBERSHIP (The Key Integration!)
+// ============================================
+
+/**
+ * Add a user to an org with a role
+ *
+ * THIS is where we sync to Zanvex:
+ * - role "admin" → (org, admin_of, user)
+ * - role "member" → (org, member_of, user)
+ */
+export const addUserToOrg = mutation({
+  args: {
+    userId: v.id("users"),
+    orgId: v.id("orgs"),
+    role: v.union(v.literal("admin"), v.literal("member")),
+  },
+  handler: async (ctx, { userId, orgId, role }) => {
+    // Check if already member
+    const existing = await ctx.db
+      .query("org_members")
+      .withIndex("by_org_user", (q) => q.eq("orgId", orgId).eq("userId", userId))
+      .first();
+
+    if (existing) {
+      throw new Error("User already in org");
+    }
+
+    // 1. Store in app's join table
+    await ctx.db.insert("org_members", { orgId, userId, role });
+
+    // 2. Mirror to Zanvex
+    const relation = role === "admin" ? "admin_of" : "member_of";
+    await zanvex.write(
+      ctx,
+      { type: "org", id: orgId },
+      relation,
+      { type: "user", id: userId }
+    );
+
+    return { success: true };
+  },
+});
+
+/**
+ * Remove a user from an org
+ */
+export const removeUserFromOrg = mutation({
+  args: {
+    userId: v.id("users"),
+    orgId: v.id("orgs"),
+  },
+  handler: async (ctx, { userId, orgId }) => {
+    // Find membership
+    const membership = await ctx.db
+      .query("org_members")
+      .withIndex("by_org_user", (q) => q.eq("orgId", orgId).eq("userId", userId))
+      .first();
+
+    if (!membership) {
+      throw new Error("User not in org");
+    }
+
+    // Remove from app table
+    await ctx.db.delete(membership._id);
+
+    // Remove from Zanvex (both possible relations)
+    await zanvex.remove(
+      ctx,
+      { type: "org", id: orgId },
+      "admin_of",
+      { type: "user", id: userId }
+    );
+    await zanvex.remove(
+      ctx,
+      { type: "org", id: orgId },
+      "member_of",
+      { type: "user", id: userId }
+    );
+
+    return { success: true };
+  },
+});
+
+/**
+ * List org members (from app table)
+ */
+export const listOrgMembers = query({
+  args: { orgId: v.id("orgs") },
+  handler: async (ctx, { orgId }) => {
+    const memberships = await ctx.db
+      .query("org_members")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+
+    // Enrich with user data
+    const enriched = await Promise.all(
+      memberships.map(async (m) => {
+        const user = await ctx.db.get(m.userId);
+        return {
+          ...m,
+          userName: user?.name ?? "Unknown",
+          userEmail: user?.email ?? "Unknown",
+        };
+      })
+    );
+
+    return enriched;
+  },
+});
+
+// ============================================
+// RESOURCE MANAGEMENT
+// ============================================
+
+/**
+ * Create a resource owned by an org
+ *
+ * Syncs to Zanvex: (resource, owner, org)
+ */
+export const createResource = mutation({
+  args: {
+    name: v.string(),
+    orgId: v.id("orgs"),
+  },
+  handler: async (ctx, { name, orgId }) => {
+    // 1. Store in app table
+    const id = await ctx.db.insert("resources", { name, orgId });
+
+    // 2. Mirror ownership to Zanvex
+    await zanvex.write(
+      ctx,
+      { type: "resource", id },
+      "owner",
+      { type: "org", id: orgId }
+    );
+
+    return id;
+  },
+});
+
+/**
+ * List resources (from app table)
+ */
+export const listResources = query({
+  args: {},
+  handler: async (ctx) => {
+    const resources = await ctx.db.query("resources").collect();
+
+    // Enrich with org data
+    const enriched = await Promise.all(
+      resources.map(async (r) => {
+        const org = await ctx.db.get(r.orgId);
+        return {
+          ...r,
+          orgName: org?.name ?? "Unknown",
+        };
+      })
+    );
+
+    return enriched;
+  },
+});
+
+/**
+ * Delete a resource
+ */
+export const deleteResource = mutation({
+  args: { resourceId: v.id("resources") },
+  handler: async (ctx, { resourceId }) => {
+    // Remove Zanvex tuples
+    await zanvex.removeAllForObject(ctx, { type: "resource", id: resourceId });
+
+    // Delete resource
+    await ctx.db.delete(resourceId);
+  },
+});
+
+// ============================================
+// PERMISSION CHECKS (Using Zanvex!)
+// ============================================
+
+/**
+ * Check if a user can manage a resource
+ *
+ * This is the magic: Zanvex traverses
+ * user → admin_of → org → owner → resource
+ */
+export const canUserManageResource = query({
+  args: {
+    userId: v.id("users"),
+    resourceId: v.id("resources"),
+  },
+  handler: async (ctx, { userId, resourceId }) => {
+    // Use Zanvex's 1-hop traversal
+    const canManage = await zanvex.check(
+      ctx,
+      { type: "resource", id: resourceId },
+      "owner",
+      { type: "user", id: userId }
+    );
+
+    return canManage;
+  },
+});
+
+/**
+ * Check if a user is admin of an org
+ */
+export const isUserOrgAdmin = query({
+  args: {
+    userId: v.id("users"),
+    orgId: v.id("orgs"),
+  },
+  handler: async (ctx, { userId, orgId }) => {
+    return await zanvex.check(
+      ctx,
+      { type: "org", id: orgId },
+      "admin_of",
+      { type: "user", id: userId }
+    );
+  },
+});
+
+/**
+ * Check if a user is member of an org (admin OR member)
+ */
+export const isUserOrgMember = query({
+  args: {
+    userId: v.id("users"),
+    orgId: v.id("orgs"),
+  },
+  handler: async (ctx, { userId, orgId }) => {
+    const isAdmin = await zanvex.check(
+      ctx,
+      { type: "org", id: orgId },
+      "admin_of",
+      { type: "user", id: userId }
+    );
+
+    if (isAdmin) return true;
+
+    return await zanvex.check(
+      ctx,
+      { type: "org", id: orgId },
+      "member_of",
+      { type: "user", id: userId }
+    );
+  },
+});
+
+// ============================================
+// INTROSPECTION
+// ============================================
+
+/**
+ * Get all Zanvex tuples (for debugging)
+ */
+export const getAllTuples = query({
+  args: {},
+  handler: async (ctx) => {
+    // This is a bit hacky - we're querying the component's table directly
+    // In a real app, you'd use listTuplesForObject or listRelations
+    // For the test harness, we want to see everything
+    const users = await ctx.db.query("users").collect();
+    const orgs = await ctx.db.query("orgs").collect();
+    const resources = await ctx.db.query("resources").collect();
+
+    const allTuples: Array<{
+      object: string;
+      relation: string;
+      subject: string;
+    }> = [];
+
+    // Get tuples for each org
+    for (const org of orgs) {
+      const tuples = await zanvex.listTuplesForObject(ctx, {
+        type: "org",
+        id: org._id,
+      });
+      for (const t of tuples) {
+        allTuples.push({
+          object: `org:${org.name}`,
+          relation: t.relation,
+          subject: `${t.subjectType}:${t.subjectId}`,
+        });
+      }
+    }
+
+    // Get tuples for each resource
+    for (const resource of resources) {
+      const tuples = await zanvex.listTuplesForObject(ctx, {
+        type: "resource",
+        id: resource._id,
+      });
+      for (const t of tuples) {
+        const org = orgs.find((o) => o._id === t.subjectId);
+        allTuples.push({
+          object: `resource:${resource.name}`,
+          relation: t.relation,
+          subject: `${t.subjectType}:${org?.name ?? t.subjectId}`,
+        });
+      }
+    }
+
+    return allTuples;
+  },
+});
+
+// ============================================
+// RESET
+// ============================================
+
+/**
+ * Clear all app data AND Zanvex tuples
+ */
+export const clearAll = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Clear app tables
+    const users = await ctx.db.query("users").collect();
+    const orgs = await ctx.db.query("orgs").collect();
+    const resources = await ctx.db.query("resources").collect();
+    const memberships = await ctx.db.query("org_members").collect();
+
+    for (const m of memberships) await ctx.db.delete(m._id);
+    for (const r of resources) await ctx.db.delete(r._id);
+    for (const o of orgs) await ctx.db.delete(o._id);
+    for (const u of users) await ctx.db.delete(u._id);
+
+    // Clear Zanvex tuples
+    const zanvexDeleted = await zanvex.clearAll(ctx);
+
+    return {
+      users: users.length,
+      orgs: orgs.length,
+      resources: resources.length,
+      memberships: memberships.length,
+      zanvexTuples: zanvexDeleted,
+    };
+  },
+});

@@ -2,508 +2,654 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Check, X, Plus, Trash2, Users, Building2, Box } from "lucide-react";
+import {
+  Check,
+  X,
+  Plus,
+  Trash2,
+  Users,
+  Building2,
+  Box,
+  ArrowRight,
+  Database,
+  GitBranch,
+  Shield,
+} from "lucide-react";
+import { Id } from "../convex/_generated/dataModel";
 
-function PermissionDemo() {
-  // Entity creation inputs
-  const [newUserId, setNewUserId] = useState("");
-  const [newOrgId, setNewOrgId] = useState("");
-  const [newResourceId, setNewResourceId] = useState("");
+function TestHarness() {
+  // Form inputs
+  const [userName, setUserName] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [orgName, setOrgName] = useState("");
+  const [orgSlug, setOrgSlug] = useState("");
+  const [resourceName, setResourceName] = useState("");
 
-  // Relationship creation inputs
-  const [relUserId, setRelUserId] = useState("");
-  const [relOrgId, setRelOrgId] = useState("");
-  const [relResourceId, setRelResourceId] = useState("");
-
-  // Permission check inputs
-  const [checkUserId, setCheckUserId] = useState("");
-  const [checkOrgId, setCheckOrgId] = useState("");
-  const [checkResourceId, setCheckResourceId] = useState("");
-
-  // Local state to track created entities (for display purposes)
-  const [users, setUsers] = useState<string[]>([]);
-  const [orgs, setOrgs] = useState<string[]>([]);
-  const [resources, setResources] = useState<string[]>([]);
-
-  // Queries - only run when we have values to check
-  const canAccess = useQuery(
-    api.example.canAccessResource,
-    checkUserId && checkResourceId ? { userId: checkUserId, resourceId: checkResourceId } : "skip"
+  // Selection state
+  const [selectedUserId, setSelectedUserId] = useState<Id<"users"> | null>(
+    null
   );
-  const isMember = useQuery(
-    api.example.isOrgMember,
-    checkUserId && checkOrgId ? { userId: checkUserId, orgId: checkOrgId } : "skip"
-  );
+  const [selectedOrgId, setSelectedOrgId] = useState<Id<"orgs"> | null>(null);
+  const [selectedResourceId, setSelectedResourceId] =
+    useState<Id<"resources"> | null>(null);
+  const [selectedRole, setSelectedRole] = useState<"admin" | "member">("admin");
+
+  // Queries - App Data
+  const users = useQuery(api.app.listUsers) ?? [];
+  const orgs = useQuery(api.app.listOrgs) ?? [];
+  const resources = useQuery(api.app.listResources) ?? [];
   const orgMembers = useQuery(
-    api.example.listOrgMembers,
-    checkOrgId ? { orgId: checkOrgId } : "skip"
+    api.app.listOrgMembers,
+    selectedOrgId ? { orgId: selectedOrgId } : "skip"
   );
-  const resourcePermissions = useQuery(
-    api.example.listResourcePermissions,
-    checkResourceId ? { resourceId: checkResourceId } : "skip"
+
+  // Queries - Zanvex Tuples
+  const allTuples = useQuery(api.app.getAllTuples) ?? [];
+
+  // Queries - Permission Checks
+  const canManageResource = useQuery(
+    api.app.canUserManageResource,
+    selectedUserId && selectedResourceId
+      ? { userId: selectedUserId, resourceId: selectedResourceId }
+      : "skip"
+  );
+  const isOrgAdmin = useQuery(
+    api.app.isUserOrgAdmin,
+    selectedUserId && selectedOrgId
+      ? { userId: selectedUserId, orgId: selectedOrgId }
+      : "skip"
+  );
+  const isOrgMember = useQuery(
+    api.app.isUserOrgMember,
+    selectedUserId && selectedOrgId
+      ? { userId: selectedUserId, orgId: selectedOrgId }
+      : "skip"
   );
 
   // Mutations
-  const addUserToOrg = useMutation(api.example.addUserToOrg);
-  const removeUserFromOrg = useMutation(api.example.removeUserFromOrg);
-  const assignResourceToOrg = useMutation(api.example.assignResourceToOrg);
-  const removeResourceFromOrg = useMutation(api.example.removeResourceFromOrg);
-  const clearAllData = useMutation(api.example.clearAllData);
+  const createUser = useMutation(api.app.createUser);
+  const deleteUser = useMutation(api.app.deleteUser);
+  const createOrg = useMutation(api.app.createOrg);
+  const deleteOrg = useMutation(api.app.deleteOrg);
+  const createResource = useMutation(api.app.createResource);
+  const deleteResource = useMutation(api.app.deleteResource);
+  const addUserToOrg = useMutation(api.app.addUserToOrg);
+  const removeUserFromOrg = useMutation(api.app.removeUserFromOrg);
+  const clearAll = useMutation(api.app.clearAll);
 
-  // Helper to add entity to local list
-  const addUser = () => {
-    if (newUserId && !users.includes(newUserId)) {
-      setUsers([...users, newUserId]);
-      setNewUserId("");
+  // Handlers
+  const handleCreateUser = async () => {
+    if (userName && userEmail) {
+      await createUser({ name: userName, email: userEmail });
+      setUserName("");
+      setUserEmail("");
     }
   };
 
-  const addOrg = () => {
-    if (newOrgId && !orgs.includes(newOrgId)) {
-      setOrgs([...orgs, newOrgId]);
-      setNewOrgId("");
+  const handleCreateOrg = async () => {
+    if (orgName && orgSlug) {
+      await createOrg({ name: orgName, slug: orgSlug });
+      setOrgName("");
+      setOrgSlug("");
     }
   };
 
-  const addResource = () => {
-    if (newResourceId && !resources.includes(newResourceId)) {
-      setResources([...resources, newResourceId]);
-      setNewResourceId("");
+  const handleCreateResource = async () => {
+    if (resourceName && selectedOrgId) {
+      await createResource({ name: resourceName, orgId: selectedOrgId });
+      setResourceName("");
     }
   };
 
   const handleAddUserToOrg = async () => {
-    if (relUserId && relOrgId) {
-      await addUserToOrg({ userId: relUserId, orgId: relOrgId });
-      // Auto-add to local lists if not present
-      if (!users.includes(relUserId)) setUsers([...users, relUserId]);
-      if (!orgs.includes(relOrgId)) setOrgs([...orgs, relOrgId]);
+    if (selectedUserId && selectedOrgId) {
+      try {
+        await addUserToOrg({
+          userId: selectedUserId,
+          orgId: selectedOrgId,
+          role: selectedRole,
+        });
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
   const handleRemoveUserFromOrg = async () => {
-    if (relUserId && relOrgId) {
-      await removeUserFromOrg({ userId: relUserId, orgId: relOrgId });
-    }
-  };
-
-  const handleAssignResourceToOrg = async () => {
-    if (relResourceId && relOrgId) {
-      await assignResourceToOrg({ resourceId: relResourceId, orgId: relOrgId });
-      // Auto-add to local lists if not present
-      if (!resources.includes(relResourceId)) setResources([...resources, relResourceId]);
-      if (!orgs.includes(relOrgId)) setOrgs([...orgs, relOrgId]);
-    }
-  };
-
-  const handleRemoveResourceFromOrg = async () => {
-    if (relResourceId && relOrgId) {
-      await removeResourceFromOrg({ resourceId: relResourceId, orgId: relOrgId });
+    if (selectedUserId && selectedOrgId) {
+      try {
+        await removeUserFromOrg({
+          userId: selectedUserId,
+          orgId: selectedOrgId,
+        });
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Entity Creation */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="size-4" />
-              Users
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Input
-                placeholder="user id..."
-                value={newUserId}
-                onChange={(e) => setNewUserId(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addUser()}
-              />
-              <Button size="icon" onClick={addUser} disabled={!newUserId}>
-                <Plus className="size-4" />
-              </Button>
-            </div>
-            {users.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+    <div className="space-y-8">
+      {/* Section 1: Create App Data */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Database className="size-5" />
+          <h2 className="text-xl font-semibold">App Data</h2>
+          <span className="text-muted-foreground text-sm">
+            (stored in Convex tables)
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Users */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Users className="size-4" />
+                Users ({users.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Input
+                  placeholder="Name"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                />
+                <Input
+                  placeholder="Email"
+                  value={userEmail}
+                  onChange={(e) => setUserEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateUser()}
+                />
+                <Button
+                  className="w-full"
+                  size="sm"
+                  onClick={handleCreateUser}
+                  disabled={!userName || !userEmail}
+                >
+                  <Plus className="size-4 mr-1" /> Create User
+                </Button>
+              </div>
+              <div className="space-y-1 max-h-40 overflow-auto">
                 {users.map((u) => (
-                  <span
-                    key={u}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-secondary rounded-md cursor-pointer hover:bg-secondary/80"
-                    onClick={() => {
-                      setRelUserId(u);
-                      setCheckUserId(u);
-                    }}
+                  <div
+                    key={u._id}
+                    className={`flex items-center justify-between p-2 rounded text-sm cursor-pointer transition-colors ${
+                      selectedUserId === u._id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary hover:bg-secondary/80"
+                    }`}
+                    onClick={() =>
+                      setSelectedUserId(
+                        selectedUserId === u._id ? null : u._id
+                      )
+                    }
                   >
-                    {u}
-                    <X
-                      className="size-3 hover:text-destructive"
+                    <div className="truncate">
+                      <span className="font-medium">{u.name}</span>
+                      <span className="text-xs opacity-70 ml-2">{u.email}</span>
+                    </div>
+                    <Trash2
+                      className="size-4 opacity-50 hover:opacity-100 hover:text-destructive shrink-0"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setUsers(users.filter((x) => x !== u));
+                        deleteUser({ userId: u._id });
                       }}
                     />
-                  </span>
+                  </div>
                 ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Building2 className="size-4" />
-              Organizations
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Input
-                placeholder="org id..."
-                value={newOrgId}
-                onChange={(e) => setNewOrgId(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addOrg()}
-              />
-              <Button size="icon" onClick={addOrg} disabled={!newOrgId}>
-                <Plus className="size-4" />
-              </Button>
-            </div>
-            {orgs.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+          {/* Orgs */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Building2 className="size-4" />
+                Organizations ({orgs.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Input
+                  placeholder="Name"
+                  value={orgName}
+                  onChange={(e) => setOrgName(e.target.value)}
+                />
+                <Input
+                  placeholder="Slug"
+                  value={orgSlug}
+                  onChange={(e) => setOrgSlug(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateOrg()}
+                />
+                <Button
+                  className="w-full"
+                  size="sm"
+                  onClick={handleCreateOrg}
+                  disabled={!orgName || !orgSlug}
+                >
+                  <Plus className="size-4 mr-1" /> Create Org
+                </Button>
+              </div>
+              <div className="space-y-1 max-h-40 overflow-auto">
                 {orgs.map((o) => (
-                  <span
-                    key={o}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-secondary rounded-md cursor-pointer hover:bg-secondary/80"
-                    onClick={() => {
-                      setRelOrgId(o);
-                      setCheckOrgId(o);
-                    }}
+                  <div
+                    key={o._id}
+                    className={`flex items-center justify-between p-2 rounded text-sm cursor-pointer transition-colors ${
+                      selectedOrgId === o._id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary hover:bg-secondary/80"
+                    }`}
+                    onClick={() =>
+                      setSelectedOrgId(selectedOrgId === o._id ? null : o._id)
+                    }
                   >
-                    {o}
-                    <X
-                      className="size-3 hover:text-destructive"
+                    <div className="truncate">
+                      <span className="font-medium">{o.name}</span>
+                      <span className="text-xs opacity-70 ml-2">/{o.slug}</span>
+                    </div>
+                    <Trash2
+                      className="size-4 opacity-50 hover:opacity-100 hover:text-destructive shrink-0"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setOrgs(orgs.filter((x) => x !== o));
+                        deleteOrg({ orgId: o._id });
                       }}
                     />
-                  </span>
+                  </div>
                 ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Box className="size-4" />
-              Resources
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Input
-                placeholder="resource id..."
-                value={newResourceId}
-                onChange={(e) => setNewResourceId(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addResource()}
-              />
-              <Button size="icon" onClick={addResource} disabled={!newResourceId}>
-                <Plus className="size-4" />
-              </Button>
-            </div>
-            {resources.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+          {/* Resources */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Box className="size-4" />
+                Resources ({resources.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Input
+                  placeholder="Name"
+                  value={resourceName}
+                  onChange={(e) => setResourceName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateResource()}
+                />
+                <div className="text-xs text-muted-foreground">
+                  {selectedOrgId
+                    ? `Will be owned by: ${orgs.find((o) => o._id === selectedOrgId)?.name}`
+                    : "Select an org first"}
+                </div>
+                <Button
+                  className="w-full"
+                  size="sm"
+                  onClick={handleCreateResource}
+                  disabled={!resourceName || !selectedOrgId}
+                >
+                  <Plus className="size-4 mr-1" /> Create Resource
+                </Button>
+              </div>
+              <div className="space-y-1 max-h-40 overflow-auto">
                 {resources.map((r) => (
-                  <span
-                    key={r}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-secondary rounded-md cursor-pointer hover:bg-secondary/80"
-                    onClick={() => {
-                      setRelResourceId(r);
-                      setCheckResourceId(r);
-                    }}
+                  <div
+                    key={r._id}
+                    className={`flex items-center justify-between p-2 rounded text-sm cursor-pointer transition-colors ${
+                      selectedResourceId === r._id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary hover:bg-secondary/80"
+                    }`}
+                    onClick={() =>
+                      setSelectedResourceId(
+                        selectedResourceId === r._id ? null : r._id
+                      )
+                    }
                   >
-                    {r}
-                    <X
-                      className="size-3 hover:text-destructive"
+                    <div className="truncate">
+                      <span className="font-medium">{r.name}</span>
+                      <span className="text-xs opacity-70 ml-2">
+                        @{r.orgName}
+                      </span>
+                    </div>
+                    <Trash2
+                      className="size-4 opacity-50 hover:opacity-100 hover:text-destructive shrink-0"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setResources(resources.filter((x) => x !== r));
+                        deleteResource({ resourceId: r._id });
                       }}
                     />
-                  </span>
+                  </div>
                 ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
-      {/* Relationship Management */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Create Relationships</CardTitle>
-          <CardDescription>
-            Add users to orgs, assign resources to orgs. Click entity chips above to auto-fill.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* User to Org */}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">User</label>
-              <Input
-                className="w-32"
-                placeholder="user..."
-                value={relUserId}
-                onChange={(e) => setRelUserId(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Org</label>
-              <Input
-                className="w-32"
-                placeholder="org..."
-                value={relOrgId}
-                onChange={(e) => setRelOrgId(e.target.value)}
-              />
-            </div>
-            <Button onClick={handleAddUserToOrg} disabled={!relUserId || !relOrgId} size="sm">
-              <Plus className="size-4 mr-1" />
-              Add User to Org
-            </Button>
-            <Button onClick={handleRemoveUserFromOrg} disabled={!relUserId || !relOrgId} variant="destructive" size="sm">
-              <Trash2 className="size-4 mr-1" />
-              Remove
-            </Button>
-          </div>
+      {/* Section 2: Relationship Management */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <GitBranch className="size-5" />
+          <h2 className="text-xl font-semibold">Relationships</h2>
+          <span className="text-muted-foreground text-sm">
+            (synced to Zanvex tuples)
+          </span>
+        </div>
 
-          {/* Resource to Org */}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Resource</label>
-              <Input
-                className="w-32"
-                placeholder="resource..."
-                value={relResourceId}
-                onChange={(e) => setRelResourceId(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Org</label>
-              <Input
-                className="w-32"
-                placeholder="org..."
-                value={relOrgId}
-                onChange={(e) => setRelOrgId(e.target.value)}
-              />
-            </div>
-            <Button onClick={handleAssignResourceToOrg} disabled={!relResourceId || !relOrgId} size="sm">
-              <Plus className="size-4 mr-1" />
-              Assign Resource to Org
-            </Button>
-            <Button onClick={handleRemoveResourceFromOrg} disabled={!relResourceId || !relOrgId} variant="destructive" size="sm">
-              <Trash2 className="size-4 mr-1" />
-              Remove
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Permission Checks */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Permission Checks</CardTitle>
-          <CardDescription>
-            Test permission checks. Click entity chips above to auto-fill.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">User</label>
-              <Input
-                placeholder="user..."
-                value={checkUserId}
-                onChange={(e) => setCheckUserId(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Org</label>
-              <Input
-                placeholder="org..."
-                value={checkOrgId}
-                onChange={(e) => setCheckOrgId(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Resource</label>
-              <Input
-                placeholder="resource..."
-                value={checkResourceId}
-                onChange={(e) => setCheckResourceId(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Can Access Resource */}
-            <div className={`p-4 rounded-lg border ${
-              canAccess === undefined ? "border-border" :
-              canAccess ? "border-green-500/50 bg-green-500/5" : "border-destructive/50 bg-destructive/5"
-            }`}>
-              <div className="flex items-center gap-2 mb-2">
-                {canAccess === undefined ? null : canAccess ? (
-                  <Check className="size-5 text-green-500" />
-                ) : (
-                  <X className="size-5 text-destructive" />
-                )}
-                <span className="font-medium">Can Access Resource?</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Add User to Org */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Add User to Org</CardTitle>
+              <CardDescription>
+                Creates membership AND Zanvex tuple
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2 text-sm">
+                <span
+                  className={`px-2 py-1 rounded ${selectedUserId ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+                >
+                  {selectedUserId
+                    ? users.find((u) => u._id === selectedUserId)?.name ??
+                      "User"
+                    : "Select user"}
+                </span>
+                <ArrowRight className="size-4" />
+                <select
+                  className="px-2 py-1 rounded bg-secondary border-0 text-sm"
+                  value={selectedRole}
+                  onChange={(e) =>
+                    setSelectedRole(e.target.value as "admin" | "member")
+                  }
+                >
+                  <option value="admin">admin_of</option>
+                  <option value="member">member_of</option>
+                </select>
+                <ArrowRight className="size-4" />
+                <span
+                  className={`px-2 py-1 rounded ${selectedOrgId ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+                >
+                  {selectedOrgId
+                    ? orgs.find((o) => o._id === selectedOrgId)?.name ?? "Org"
+                    : "Select org"}
+                </span>
               </div>
-              {checkUserId && checkResourceId ? (
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  size="sm"
+                  onClick={handleAddUserToOrg}
+                  disabled={!selectedUserId || !selectedOrgId}
+                >
+                  <Plus className="size-4 mr-1" /> Add
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleRemoveUserFromOrg}
+                  disabled={!selectedUserId || !selectedOrgId}
+                >
+                  <Trash2 className="size-4 mr-1" /> Remove
+                </Button>
+              </div>
+
+              {/* Show org members */}
+              {selectedOrgId && orgMembers && orgMembers.length > 0 && (
+                <div className="pt-2 border-t">
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Current members:
+                  </div>
+                  <div className="space-y-1">
+                    {orgMembers.map((m) => (
+                      <div
+                        key={m._id}
+                        className="text-xs flex items-center gap-2"
+                      >
+                        <span
+                          className={`px-1.5 py-0.5 rounded ${m.role === "admin" ? "bg-yellow-500/20 text-yellow-600" : "bg-blue-500/20 text-blue-600"}`}
+                        >
+                          {m.role}
+                        </span>
+                        <span>{m.userName}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Zanvex Tuples View */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Zanvex Tuples ({allTuples.length})
+              </CardTitle>
+              <CardDescription>Live view of permission graph</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1 max-h-48 overflow-auto font-mono text-xs">
+                {allTuples.length === 0 ? (
+                  <p className="text-muted-foreground italic">No tuples yet</p>
+                ) : (
+                  allTuples.map((t, i) => (
+                    <div key={i} className="flex items-center gap-1">
+                      <span className="text-blue-500">{t.object}</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="text-yellow-500">{t.relation}</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="text-green-500">{t.subject}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Section 3: Permission Checks */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Shield className="size-5" />
+          <h2 className="text-xl font-semibold">Permission Checks</h2>
+          <span className="text-muted-foreground text-sm">
+            (Zanvex with 1-hop traversal)
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Is Org Admin */}
+          <Card
+            className={`border-2 ${
+              isOrgAdmin === undefined
+                ? "border-border"
+                : isOrgAdmin
+                  ? "border-green-500"
+                  : "border-destructive"
+            }`}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                {isOrgAdmin !== undefined &&
+                  (isOrgAdmin ? (
+                    <Check className="size-4 text-green-500" />
+                  ) : (
+                    <X className="size-4 text-destructive" />
+                  ))}
+                Is Org Admin?
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {selectedUserId && selectedOrgId ? (
                 <>
                   <code className="text-xs text-muted-foreground block mb-2">
-                    check(resource:{checkResourceId}, owner, user:{checkUserId})
+                    check(org, admin_of, user)
                   </code>
-                  <p className={`text-xl font-bold ${
-                    canAccess === undefined ? "text-muted-foreground" :
-                    canAccess ? "text-green-500" : "text-destructive"
-                  }`}>
-                    {canAccess === undefined ? "Loading..." : canAccess ? "YES" : "NO"}
+                  <p
+                    className={`text-2xl font-bold ${isOrgAdmin ? "text-green-500" : "text-destructive"}`}
+                  >
+                    {isOrgAdmin === undefined
+                      ? "..."
+                      : isOrgAdmin
+                        ? "YES"
+                        : "NO"}
                   </p>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">Enter user & resource to check</p>
+                <p className="text-sm text-muted-foreground">
+                  Select user & org
+                </p>
               )}
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Is Org Member */}
-            <div className={`p-4 rounded-lg border ${
-              isMember === undefined ? "border-border" :
-              isMember ? "border-green-500/50 bg-green-500/5" : "border-destructive/50 bg-destructive/5"
-            }`}>
-              <div className="flex items-center gap-2 mb-2">
-                {isMember === undefined ? null : isMember ? (
-                  <Check className="size-5 text-green-500" />
-                ) : (
-                  <X className="size-5 text-destructive" />
-                )}
-                <span className="font-medium">Is Org Member?</span>
-              </div>
-              {checkUserId && checkOrgId ? (
+          {/* Is Org Member */}
+          <Card
+            className={`border-2 ${
+              isOrgMember === undefined
+                ? "border-border"
+                : isOrgMember
+                  ? "border-green-500"
+                  : "border-destructive"
+            }`}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                {isOrgMember !== undefined &&
+                  (isOrgMember ? (
+                    <Check className="size-4 text-green-500" />
+                  ) : (
+                    <X className="size-4 text-destructive" />
+                  ))}
+                Is Org Member?
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {selectedUserId && selectedOrgId ? (
                 <>
                   <code className="text-xs text-muted-foreground block mb-2">
-                    check(org:{checkOrgId}, member_of, user:{checkUserId})
+                    admin_of OR member_of
                   </code>
-                  <p className={`text-xl font-bold ${
-                    isMember === undefined ? "text-muted-foreground" :
-                    isMember ? "text-green-500" : "text-destructive"
-                  }`}>
-                    {isMember === undefined ? "Loading..." : isMember ? "YES" : "NO"}
+                  <p
+                    className={`text-2xl font-bold ${isOrgMember ? "text-green-500" : "text-destructive"}`}
+                  >
+                    {isOrgMember === undefined
+                      ? "..."
+                      : isOrgMember
+                        ? "YES"
+                        : "NO"}
                   </p>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">Enter user & org to check</p>
+                <p className="text-sm text-muted-foreground">
+                  Select user & org
+                </p>
               )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* Introspection */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Org Members {checkOrgId && <span className="text-muted-foreground font-normal">({checkOrgId})</span>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!checkOrgId ? (
-              <p className="text-sm text-muted-foreground">Enter an org above to see members</p>
-            ) : orgMembers === undefined ? (
-              <p className="text-sm text-muted-foreground">Loading...</p>
-            ) : orgMembers.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">No members</p>
-            ) : (
-              <ul className="space-y-1">
-                {orgMembers.map((m, i) => (
-                  <li key={i} className="text-sm flex items-center gap-2">
-                    <Users className="size-3 text-muted-foreground" />
-                    {m.subjectType}:{m.subjectId}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+          {/* Can Manage Resource */}
+          <Card
+            className={`border-2 ${
+              canManageResource === undefined
+                ? "border-border"
+                : canManageResource
+                  ? "border-green-500"
+                  : "border-destructive"
+            }`}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                {canManageResource !== undefined &&
+                  (canManageResource ? (
+                    <Check className="size-4 text-green-500" />
+                  ) : (
+                    <X className="size-4 text-destructive" />
+                  ))}
+                Can Manage Resource?
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {selectedUserId && selectedResourceId ? (
+                <>
+                  <code className="text-xs text-muted-foreground block mb-2">
+                    user → org → resource
+                  </code>
+                  <p
+                    className={`text-2xl font-bold ${canManageResource ? "text-green-500" : "text-destructive"}`}
+                  >
+                    {canManageResource === undefined
+                      ? "..."
+                      : canManageResource
+                        ? "YES"
+                        : "NO"}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Select user & resource
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Resource Permissions {checkResourceId && <span className="text-muted-foreground font-normal">({checkResourceId})</span>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!checkResourceId ? (
-              <p className="text-sm text-muted-foreground">Enter a resource above to see permissions</p>
-            ) : resourcePermissions === undefined ? (
-              <p className="text-sm text-muted-foreground">Loading...</p>
-            ) : resourcePermissions.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">No permissions</p>
-            ) : (
-              <ul className="space-y-1">
-                {resourcePermissions.map((p, i) => (
-                  <li key={i} className="text-sm flex items-center gap-2">
-                    <Box className="size-3 text-muted-foreground" />
-                    {p.relation}: {p.subjectType}:{p.subjectId}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        {/* Traversal Explanation */}
+        {selectedUserId && selectedResourceId && (
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle className="text-base">1-Hop Traversal Path</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2 text-sm font-mono">
+                <span className="px-2 py-1 bg-green-500/20 rounded">
+                  user:{users.find((u) => u._id === selectedUserId)?.name}
+                </span>
+                <ArrowRight className="size-4" />
+                <span className="text-muted-foreground">
+                  admin_of/member_of?
+                </span>
+                <ArrowRight className="size-4" />
+                <span className="px-2 py-1 bg-yellow-500/20 rounded">
+                  org:?
+                </span>
+                <ArrowRight className="size-4" />
+                <span className="text-muted-foreground">owner?</span>
+                <ArrowRight className="size-4" />
+                <span className="px-2 py-1 bg-blue-500/20 rounded">
+                  resource:
+                  {resources.find((r) => r._id === selectedResourceId)?.name}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </section>
 
-      {/* How It Works */}
-      <Card>
-        <CardHeader>
-          <CardTitle>How 1-Hop Traversal Works</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <pre className="bg-muted p-4 rounded-md text-xs overflow-auto">
-{`check(resource:X, owner, user:Y)
-
-Step 1: Direct check
-  → (resource:X, owner, user:Y) exists? NO
-
-Step 2: Find Y's memberships
-  → (org:?, member_of, user:Y) exists? → returns org IDs
-
-Step 3: Check if any org has access
-  → (resource:X, owner, org:?) exists? → if YES, return true
-
-Result: TRUE if user is member of an org that owns the resource`}
-          </pre>
-        </CardContent>
-      </Card>
-
-      {/* Cleanup */}
+      {/* Clear All */}
       <div className="flex justify-end">
         <Button
           variant="outline"
           size="sm"
           onClick={() => {
-            clearAllData();
-            setUsers([]);
-            setOrgs([]);
-            setResources([]);
+            clearAll();
+            setSelectedUserId(null);
+            setSelectedOrgId(null);
+            setSelectedResourceId(null);
           }}
         >
           <Trash2 className="size-4 mr-2" />
@@ -517,17 +663,19 @@ Result: TRUE if user is member of an org that owns the resource`}
 function App() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="container max-w-4xl mx-auto py-8 px-4">
+      <div className="container max-w-5xl mx-auto py-8 px-4">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Zanvex</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Zanvex Test Harness
+            </h1>
             <p className="text-muted-foreground">
-              Zanzibar-inspired ReBAC for Convex
+              App Data + Zanvex Tuples side-by-side
             </p>
           </div>
           <ThemeToggle />
         </div>
-        <PermissionDemo />
+        <TestHarness />
       </div>
     </div>
   );
