@@ -26,6 +26,8 @@ import {
   Shield,
   Settings,
   RefreshCw,
+  Calendar,
+  Ban,
 } from "lucide-react";
 import { Id } from "../convex/_generated/dataModel";
 import { useEffect } from "react";
@@ -37,6 +39,7 @@ function TestHarness() {
   const [orgName, setOrgName] = useState("");
   const [orgSlug, setOrgSlug] = useState("");
   const [resourceName, setResourceName] = useState("");
+  const [bookingTitle, setBookingTitle] = useState("");
 
   // Selection state
   const [selectedUserId, setSelectedUserId] = useState<Id<"users"> | null>(
@@ -45,12 +48,15 @@ function TestHarness() {
   const [selectedOrgId, setSelectedOrgId] = useState<Id<"orgs"> | null>(null);
   const [selectedResourceId, setSelectedResourceId] =
     useState<Id<"resources"> | null>(null);
+  const [selectedBookingId, setSelectedBookingId] =
+    useState<Id<"bookings"> | null>(null);
   const [selectedRole, setSelectedRole] = useState<"admin" | "member">("admin");
 
   // Queries - App Data
   const users = useQuery(api.app.listUsers) ?? [];
   const orgs = useQuery(api.app.listOrgs) ?? [];
   const resources = useQuery(api.app.listResources) ?? [];
+  const bookings = useQuery(api.app.listBookings) ?? [];
   const orgMembers = useQuery(
     api.app.listOrgMembers,
     selectedOrgId ? { orgId: selectedOrgId } : "skip"
@@ -62,11 +68,19 @@ function TestHarness() {
   // Queries - Permission Schema
   const permissionSchemas = useQuery(api.app.listPermissionSchemas) ?? [];
 
-  // Queries - Resource Permissions (NEW!)
+  // Queries - Resource Permissions
   const resourcePermissions = useQuery(
     api.app.getResourcePermissions,
     selectedUserId && selectedResourceId
       ? { userId: selectedUserId, resourceId: selectedResourceId }
+      : "skip"
+  );
+
+  // Queries - Booking Permissions
+  const bookingPermissions = useQuery(
+    api.app.getBookingPermissions,
+    selectedUserId && selectedBookingId
+      ? { userId: selectedUserId, bookingId: selectedBookingId }
       : "skip"
   );
 
@@ -99,6 +113,9 @@ function TestHarness() {
   const deleteResource = useMutation(api.app.deleteResource);
   const addUserToOrg = useMutation(api.app.addUserToOrg);
   const removeUserFromOrg = useMutation(api.app.removeUserFromOrg);
+  const createBooking = useMutation(api.app.createBooking);
+  const deleteBooking = useMutation(api.app.deleteBooking);
+  const cancelBooking = useMutation(api.app.cancelBooking);
   const clearAll = useMutation(api.app.clearAll);
   const initializePermissions = useMutation(api.app.initializePermissions);
   const updatePermissionSchema = useMutation(api.app.updatePermissionSchema);
@@ -131,6 +148,18 @@ function TestHarness() {
     if (resourceName && selectedOrgId) {
       await createResource({ name: resourceName, orgId: selectedOrgId });
       setResourceName("");
+    }
+  };
+
+  const handleCreateBooking = async () => {
+    if (bookingTitle && selectedResourceId && selectedUserId) {
+      await createBooking({
+        title: bookingTitle,
+        resourceId: selectedResourceId,
+        bookerId: selectedUserId,
+        start: new Date().toISOString(),
+      });
+      setBookingTitle("");
     }
   };
 
@@ -173,7 +202,7 @@ function TestHarness() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Users */}
           <Card>
             <CardHeader className="pb-3">
@@ -354,6 +383,86 @@ function TestHarness() {
                         deleteResource({ resourceId: r._id });
                       }}
                     />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Bookings */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Calendar className="size-4" />
+                Bookings ({bookings.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Input
+                  placeholder="Booking title"
+                  value={bookingTitle}
+                  onChange={(e) => setBookingTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateBooking()}
+                />
+                <div className="text-xs text-muted-foreground">
+                  {selectedResourceId && selectedUserId
+                    ? `${users.find((u) => u._id === selectedUserId)?.name} books ${resources.find((r) => r._id === selectedResourceId)?.name}`
+                    : "Select user & resource first"}
+                </div>
+                <Button
+                  className="w-full"
+                  size="sm"
+                  onClick={handleCreateBooking}
+                  disabled={!bookingTitle || !selectedResourceId || !selectedUserId}
+                >
+                  <Plus className="size-4 mr-1" /> Create Booking
+                </Button>
+              </div>
+              <div className="space-y-1 max-h-40 overflow-auto">
+                {bookings.map((b) => (
+                  <div
+                    key={b._id}
+                    className={`flex items-center justify-between p-2 rounded text-sm cursor-pointer transition-colors ${
+                      selectedBookingId === b._id
+                        ? "bg-primary text-primary-foreground"
+                        : b.status === "cancelled"
+                          ? "bg-destructive/20"
+                          : "bg-secondary hover:bg-secondary/80"
+                    }`}
+                    onClick={() =>
+                      setSelectedBookingId(
+                        selectedBookingId === b._id ? null : b._id
+                      )
+                    }
+                  >
+                    <div className="truncate">
+                      <span className="font-medium">{b.title}</span>
+                      <span className="text-xs opacity-70 ml-2">
+                        @{b.resourceName}
+                      </span>
+                      {b.status === "cancelled" && (
+                        <span className="text-xs ml-1 text-destructive">(cancelled)</span>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      {b.status !== "cancelled" && (
+                        <Ban
+                          className="size-4 opacity-50 hover:opacity-100 hover:text-yellow-500 shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            cancelBooking({ bookingId: b._id });
+                          }}
+                        />
+                      )}
+                      <Trash2
+                        className="size-4 opacity-50 hover:opacity-100 hover:text-destructive shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteBooking({ bookingId: b._id });
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -686,6 +795,60 @@ function TestHarness() {
           </Card>
         )}
 
+        {/* Booking Permissions Card */}
+        {selectedUserId && selectedBookingId && (
+          <Card className="mt-4 border-2 border-yellow-500">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="size-4" />
+                Booking Permissions
+                {bookingPermissions?.relation && (
+                  <span className="text-xs font-normal bg-yellow-500/20 px-2 py-0.5 rounded">
+                    via {bookingPermissions.relation}
+                  </span>
+                )}
+              </CardTitle>
+              <CardDescription>
+                What can{" "}
+                {users.find((u) => u._id === selectedUserId)?.name ?? "user"} do
+                with{" "}
+                {bookings.find((b) => b._id === selectedBookingId)?.title ??
+                  "booking"}
+                ?
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-5 gap-4">
+                {(["create", "read", "update", "delete", "cancel"] as const).map(
+                  (action) => {
+                    const allowed =
+                      bookingPermissions?.[action as keyof typeof bookingPermissions];
+                    return (
+                      <div
+                        key={action}
+                        className={`flex flex-col items-center p-3 rounded-lg border-2 ${
+                          allowed
+                            ? "border-green-500 bg-green-500/10"
+                            : "border-destructive/50 bg-destructive/5"
+                        }`}
+                      >
+                        {allowed ? (
+                          <Check className="size-6 text-green-500 mb-1" />
+                        ) : (
+                          <X className="size-6 text-destructive mb-1" />
+                        )}
+                        <span className="text-sm font-medium capitalize">
+                          {action}
+                        </span>
+                      </div>
+                    );
+                  }
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Traversal Explanation */}
         {selectedUserId && selectedResourceId && (
           <Card className="mt-4">
@@ -810,6 +973,7 @@ function TestHarness() {
             setSelectedUserId(null);
             setSelectedOrgId(null);
             setSelectedResourceId(null);
+            setSelectedBookingId(null);
           }}
         >
           <Trash2 className="size-4 mr-2" />
@@ -823,7 +987,7 @@ function TestHarness() {
 function App() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="container max-w-5xl mx-auto py-8 px-4">
+      <div className="container max-w-7xl mx-auto py-8 px-4">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
