@@ -311,6 +311,122 @@ export const deleteResource = mutation({
 });
 
 // ============================================
+// BOOKING MANAGEMENT
+// ============================================
+
+/**
+ * Create a booking for a resource
+ *
+ * Syncs to Zanvex:
+ * - (booking, owner, resource) → resource owns this booking
+ * - (booking, booker, user) → user is the booker (can cancel)
+ */
+export const createBooking = mutation({
+  args: {
+    title: v.string(),
+    resourceId: v.id("resources"),
+    bookerId: v.id("users"),
+    start: v.string(),
+  },
+  handler: async (ctx, { title, resourceId, bookerId, start }) => {
+    // 1. Store in app table
+    const id = await ctx.db.insert("bookings", {
+      title,
+      resourceId,
+      bookerId,
+      start,
+      status: "pending",
+    });
+
+    // 2. Mirror to Zanvex - resource owns booking (for org admin access)
+    const resource = await ctx.db.get(resourceId);
+    if (resource) {
+      await zanvex.write(
+        ctx,
+        { type: "booking", id },
+        "owner",
+        { type: "resource", id: resourceId }
+      );
+    }
+
+    // 3. Booker can manage their own booking
+    await zanvex.write(
+      ctx,
+      { type: "booking", id },
+      "booker",
+      { type: "user", id: bookerId }
+    );
+
+    return id;
+  },
+});
+
+/**
+ * List bookings (from app table)
+ */
+export const listBookings = query({
+  args: {},
+  handler: async (ctx) => {
+    const bookings = await ctx.db.query("bookings").collect();
+
+    // Enrich with resource and booker data
+    const enriched = await Promise.all(
+      bookings.map(async (b) => {
+        const resource = await ctx.db.get(b.resourceId);
+        const booker = await ctx.db.get(b.bookerId);
+        return {
+          ...b,
+          resourceName: resource?.name ?? "Unknown",
+          bookerName: booker?.name ?? "Unknown",
+        };
+      })
+    );
+
+    return enriched;
+  },
+});
+
+/**
+ * Cancel a booking
+ */
+export const cancelBooking = mutation({
+  args: { bookingId: v.id("bookings") },
+  handler: async (ctx, { bookingId }) => {
+    await ctx.db.patch(bookingId, { status: "cancelled" });
+  },
+});
+
+/**
+ * Delete a booking
+ */
+export const deleteBooking = mutation({
+  args: { bookingId: v.id("bookings") },
+  handler: async (ctx, { bookingId }) => {
+    // Remove Zanvex tuples
+    await zanvex.removeAllForObject(ctx, { type: "booking", id: bookingId });
+
+    // Delete booking
+    await ctx.db.delete(bookingId);
+  },
+});
+
+/**
+ * Get booking permissions for a user
+ */
+export const getBookingPermissions = query({
+  args: {
+    userId: v.id("users"),
+    bookingId: v.id("bookings"),
+  },
+  handler: async (ctx, { userId, bookingId }) => {
+    return await zanvex.getPermissionsForObject(ctx, {
+      subject: { type: "user", id: userId },
+      object: { type: "booking", id: bookingId },
+    });
+  },
+});
+
+// ============================================
 // PERMISSION CHECKS (Using Zanvex!)
 // ============================================
 
@@ -399,6 +515,7 @@ export const getAllTuples = query({
     const users = await ctx.db.query("users").collect();
     const orgs = await ctx.db.query("orgs").collect();
     const resources = await ctx.db.query("resources").collect();
+    const bookings = await ctx.db.query("bookings").collect();
 
     const allTuples: Array<{
       object: string;
@@ -415,6 +532,10 @@ export const getAllTuples = query({
       if (subjectType === "org") {
         const org = orgs.find((o) => o._id === subjectId);
         return `org:${org?.name ?? subjectId}`;
+      }
+      if (subjectType === "resource") {
+        const resource = resources.find((r) => r._id === subjectId);
+        return `resource:${resource?.name ?? subjectId}`;
       }
       return `${subjectType}:${subjectId}`;
     };
@@ -443,6 +564,21 @@ export const getAllTuples = query({
       for (const t of tuples) {
         allTuples.push({
           object: `resource:${resource.name}`,
+          relation: t.relation,
+          subject: resolveSubject(t.subjectType, t.subjectId),
+        });
+      }
+    }
+
+    // Get tuples for each booking
+    for (const booking of bookings) {
+      const tuples = await zanvex.listTuplesForObject(ctx, {
+        type: "booking",
+        id: booking._id,
+      });
+      for (const t of tuples) {
+        allTuples.push({
+          object: `booking:${booking.title}`,
           relation: t.relation,
           subject: resolveSubject(t.subjectType, t.subjectId),
         });
@@ -481,15 +617,16 @@ export const listPermissionSchemas = query({
 });
 
 /**
- * Update permissions for a relation
+ * Update permissions for a relation + objectType
  */
 export const updatePermissionSchema = mutation({
   args: {
     relation: v.string(),
+    objectType: v.string(),
     actions: v.array(v.string()),
   },
-  handler: async (ctx, { relation, actions }) => {
-    await zanvex.setPermissions(ctx, relation, actions);
+  handler: async (ctx, { relation, objectType, actions }) => {
+    await zanvex.setPermissions(ctx, relation, objectType, actions);
   },
 });
 
@@ -543,7 +680,9 @@ export const clearAll = mutation({
     const orgs = await ctx.db.query("orgs").collect();
     const resources = await ctx.db.query("resources").collect();
     const memberships = await ctx.db.query("org_members").collect();
+    const bookings = await ctx.db.query("bookings").collect();
 
+    for (const b of bookings) await ctx.db.delete(b._id);
     for (const m of memberships) await ctx.db.delete(m._id);
     for (const r of resources) await ctx.db.delete(r._id);
     for (const o of orgs) await ctx.db.delete(o._id);
@@ -557,6 +696,7 @@ export const clearAll = mutation({
       orgs: orgs.length,
       resources: resources.length,
       memberships: memberships.length,
+      bookings: bookings.length,
       zanvexTuples: zanvexDeleted,
     };
   },

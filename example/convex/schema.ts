@@ -37,4 +37,15 @@ export default defineSchema({
     name: v.string(),
     orgId: v.id("orgs"),
   }).index("by_org", ["orgId"]),
+
+  // Bookings - belong to a resource, created by a user
+  bookings: defineTable({
+    title: v.string(),
+    resourceId: v.id("resources"),
+    bookerId: v.id("users"), // The user who made the booking
+    start: v.string(), // ISO timestamp
+    status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("cancelled")),
+  })
+    .index("by_resource", ["resourceId"])
+    .index("by_booker", ["bookerId"]),
 });

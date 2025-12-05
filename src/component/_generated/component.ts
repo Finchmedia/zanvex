@@ -94,15 +94,15 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
       deletePermissions: FunctionReference<
         "mutation",
         "internal",
-        { relation: string },
+        { objectType?: string; relation: string },
         boolean,
         Name
       >;
       getPermissions: FunctionReference<
         "query",
         "internal",
-        { relation: string },
-        { actions: Array<string>; relation: string } | null,
+        { objectType?: string; relation: string },
+        { actions: Array<string>; objectType: string; relation: string } | null,
         Name
       >;
       getPermissionsForObject: FunctionReference<
@@ -115,6 +115,8 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           subjectType: string;
         },
         {
+          actions: Array<string>;
+          cancel: boolean;
           create: boolean;
           delete: boolean;
           read: boolean;
@@ -134,13 +136,13 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "query",
         "internal",
         {},
-        Array<{ actions: Array<string>; relation: string }>,
+        Array<{ actions: Array<string>; objectType: string; relation: string }>,
         Name
       >;
       setPermissions: FunctionReference<
         "mutation",
         "internal",
-        { actions: Array<string>; relation: string },
+        { actions: Array<string>; objectType?: string; relation: string },
         string,
         Name
       >;

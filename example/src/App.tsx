@@ -750,15 +750,21 @@ function TestHarness() {
               ) : (
                 permissionSchemas.map((schema) => (
                   <div
-                    key={schema.relation}
+                    key={`${schema.relation}-${schema.objectType}`}
                     className="flex items-center gap-4 p-3 bg-secondary rounded-lg"
                   >
-                    <span className="font-mono font-medium text-sm w-24">
-                      {schema.relation}
-                    </span>
+                    <div className="flex items-center gap-2 min-w-[180px]">
+                      <span className="font-mono font-medium text-sm">
+                        {schema.relation}
+                      </span>
+                      <span className="text-xs text-muted-foreground">on</span>
+                      <span className="text-xs px-1.5 py-0.5 bg-primary/20 rounded">
+                        {schema.objectType}
+                      </span>
+                    </div>
                     <ArrowRight className="size-4 text-muted-foreground" />
-                    <div className="flex gap-2">
-                      {(["create", "read", "update", "delete"] as const).map(
+                    <div className="flex gap-2 flex-wrap">
+                      {(["create", "read", "update", "delete", "cancel"] as const).map(
                         (action) => {
                           const isEnabled = schema.actions.includes(action);
                           return (
@@ -770,6 +776,7 @@ function TestHarness() {
                                   : [...schema.actions, action];
                                 updatePermissionSchema({
                                   relation: schema.relation,
+                                  objectType: schema.objectType,
                                   actions: newActions,
                                 });
                               }}
