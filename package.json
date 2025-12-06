@@ -104,12 +104,12 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/vite": "^4.1.17",
     "@types/dagre": "^0.7.53",
+    "@xyflow/react": "^12.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex-helpers": "^0.1.106",
     "dagre": "^0.8.5",
     "lucide-react": "^0.555.0",
-    "reactflow": "^11.11.4",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.17"
   }

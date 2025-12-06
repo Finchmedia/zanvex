@@ -11,26 +11,11 @@ import {
   useNodesState,
   useEdgesState,
   MarkerType,
-} from "reactflow";
-import "reactflow/dist/style.css";
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 import { Network } from "lucide-react";
 
-// CSS to fix edge visibility
-const graphStyles = `
-  .react-flow__edge-path {
-    stroke: hsl(var(--primary));
-    stroke-width: 3;
-  }
-  .react-flow__edge .react-flow__edge-path {
-    stroke: hsl(var(--primary)) !important;
-  }
-  .react-flow__edge text {
-    fill: hsl(var(--foreground));
-    font-size: 12px;
-    font-weight: 600;
-  }
-`;
 import {
   Card,
   CardContent,
@@ -100,11 +85,8 @@ export function GraphPage() {
       },
       position: { x: 0, y: 0 },
       style: {
-        background: "hsl(var(--secondary))",
-        border: "2px solid hsl(var(--border))",
-        borderRadius: "8px",
-        padding: 0,
         width: nodeWidth,
+        padding: 0,
       },
     }));
 
@@ -122,11 +104,6 @@ export function GraphPage() {
             type: MarkerType.ArrowClosed,
             width: 20,
             height: 20,
-            color: "hsl(var(--primary))",
-          },
-          style: {
-            stroke: "hsl(var(--primary))",
-            strokeWidth: 3,
           },
         });
       });
@@ -152,7 +129,6 @@ export function GraphPage() {
 
   return (
     <div className="space-y-8">
-      <style>{graphStyles}</style>
       <section>
         <div className="flex items-center gap-2 mb-4">
           <Network className="size-5" />
@@ -193,6 +169,7 @@ export function GraphPage() {
                   onEdgesChange={onEdgesChange}
                   fitView
                   attributionPosition="bottom-left"
+                  colorMode="system"
                 >
                   <Background />
                   <Controls />

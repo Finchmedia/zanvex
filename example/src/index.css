@@ -67,6 +67,10 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* React Flow / @xyflow/react customization */
+  --xy-edge-stroke-default: oklch(0.205 0 0);
+  --xy-edge-stroke-width-default: 3;
+  --xy-edge-stroke-selected-default: oklch(0.205 0 0);
 }
 
 .dark {
@@ -97,6 +101,16 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  /* React Flow dark mode */
+  --xy-edge-stroke-default: oklch(0.922 0 0);
+  --xy-edge-stroke-selected-default: oklch(0.922 0 0);
+}
+
+/* React Flow node theming - use built-in variables */
+.react-flow {
+  --xy-node-background-color-default: hsl(var(--secondary));
+  --xy-node-border-default: 2px solid hsl(var(--border));
+  --xy-node-boxshadow-selected-default: 0 0 0 2px hsl(var(--primary) / 0.2);
 }
 
 @layer base {
