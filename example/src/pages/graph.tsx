@@ -1,6 +1,6 @@
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "@convex/_generated/api";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ReactFlow,
   Node,
@@ -11,6 +11,7 @@ import {
   useNodesState,
   useEdgesState,
   MarkerType,
+  type ColorMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { tree, hierarchy } from "d3-hierarchy";
@@ -75,6 +76,27 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
 
 export function GraphPage() {
   const objectTypes = useQuery(api.app.listObjectTypes) ?? [];
+  const [colorMode, setColorMode] = useState<ColorMode>("dark");
+
+  // Observe the dark class on document.documentElement
+  useEffect(() => {
+    // Set initial value
+    const isDark = document.documentElement.classList.contains("dark");
+    setColorMode(isDark ? "dark" : "light");
+
+    // Watch for changes to the class attribute
+    const observer = new MutationObserver(() => {
+      const isDark = document.documentElement.classList.contains("dark");
+      setColorMode(isDark ? "dark" : "light");
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   // Generate nodes and edges from object types
   const { initialNodes, initialEdges } = useMemo(() => {
@@ -184,7 +206,7 @@ export function GraphPage() {
                   onEdgesChange={onEdgesChange}
                   fitView
                   attributionPosition="bottom-left"
-                  colorMode="system"
+                  colorMode={colorMode}
                 >
                   <Background />
                   <Controls />
