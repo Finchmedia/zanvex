@@ -43,7 +43,7 @@ export default defineSchema({
     ]),
 
   /**
-   * Permission Schema
+   * Permission Schema (Legacy)
    *
    * Defines what actions each relation grants, optionally per object type.
    * This is the "policy" that determines what admin_of vs member_of can do.
@@ -69,4 +69,51 @@ export default defineSchema({
   })
     .index("by_relation", ["relation"])
     .index("by_relation_objectType", ["relation", "objectType"]),
+
+  /**
+   * Permission Rules (Zanzibar-style)
+   *
+   * Defines how permissions are computed from relations using a DSL.
+   * This enables recursive traversal through the object graph.
+   *
+   * DSL Syntax:
+   *   - "booker"           → Direct relation check
+   *   - "owner->admin_of"  → Follow 'owner' relation, check 'admin_of' permission on target
+   *   - "parent->edit | booker" → OR logic: either path grants access
+   *
+   * Example rules:
+   *   { objectType: "resource", permission: "view", expression: "owner->admin_of | owner->member_of" }
+   *   { objectType: "resource", permission: "edit", expression: "owner->admin_of" }
+   *   { objectType: "booking", permission: "view", expression: "parent->view | booker" }
+   *   { objectType: "booking", permission: "cancel", expression: "parent->edit | booker" }
+   *
+   * When checking `can(user:daniel, cancel, booking:123)`:
+   *   1. Look up rule: booking.cancel = "parent->edit | booker"
+   *   2. Evaluate "booker": Is there tuple (booking:123, booker, user:daniel)? → If yes, ALLOW
+   *   3. Evaluate "parent->edit":
+   *      - Find booking's parent → resource:studio-a
+   *      - Recursively: can(daniel, edit, resource:studio-a)
+   *        - Rule: resource.edit = "owner->admin_of"
+   *        - Find owner → org:acme
+   *        - Recursively: can(daniel, admin_of, org:acme)
+   *          - No rule → direct check → tuple exists? → YES!
+   *      - Returns true
+   *   4. Return ALLOW
+   *
+   * Key insight: If no rule exists for a permission, it's a direct relation check.
+   */
+  permission_rules: defineTable({
+    objectType: v.string(), // "booking", "resource", "org"
+    permission: v.string(), // "view", "edit", "cancel", "delete"
+    expression: v.string(), // "parent->edit | booker" (human readable DSL)
+    rules: v.array(
+      v.object({
+        // Parsed rules for evaluation
+        type: v.union(v.literal("direct"), v.literal("computed")),
+        relation: v.optional(v.string()), // For direct: "booker"
+        sourceRelation: v.optional(v.string()), // For computed: "parent"
+        targetPermission: v.optional(v.string()), // For computed: "edit"
+      })
+    ),
+  }).index("by_type_permission", ["objectType", "permission"]),
 });

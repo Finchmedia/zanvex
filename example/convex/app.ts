@@ -318,8 +318,15 @@ export const deleteResource = mutation({
  * Create a booking for a resource
  *
  * Syncs to Zanvex:
- * - (booking, owner, resource) → resource owns this booking
- * - (booking, booker, user) → user is the booker (can cancel)
+ * - (booking, parent, resource) → booking belongs to resource (for traversal!)
+ * - (booking, booker, user) → user is the booker (direct cancel access)
+ *
+ * With permission rules:
+ *   booking.cancel = "parent->edit | booker"
+ *   resource.edit = "owner->admin_of"
+ *
+ * Traversal path for org admin:
+ *   user:daniel → admin_of → org:acme → owner → resource:studio-a → parent → booking:123
  */
 export const createBooking = mutation({
   args: {
@@ -338,24 +345,18 @@ export const createBooking = mutation({
       status: "pending",
     });
 
-    // 2. Mirror to Zanvex - resource owns booking (for org admin access)
-    const resource = await ctx.db.get(resourceId);
-    if (resource) {
-      await zanvex.write(
-        ctx,
-        { type: "booking", id },
-        "owner",
-        { type: "resource", id: resourceId }
-      );
-    }
+    // 2. Mirror to Zanvex - booking's PARENT is the resource
+    // This enables traversal: booking → parent → resource → owner → org → admin_of → user
+    await zanvex.write(ctx, { type: "booking", id }, "parent", {
+      type: "resource",
+      id: resourceId,
+    });
 
-    // 3. Booker can manage their own booking
-    await zanvex.write(
-      ctx,
-      { type: "booking", id },
-      "booker",
-      { type: "user", id: bookerId }
-    );
+    // 3. Booker has direct relation (for "booker" rule in booking.cancel)
+    await zanvex.write(ctx, { type: "booking", id }, "booker", {
+      type: "user",
+      id: bookerId,
+    });
 
     return id;
   },
@@ -590,49 +591,89 @@ export const getAllTuples = query({
 });
 
 // ============================================
-// PERMISSION SCHEMA MANAGEMENT
+// PERMISSION RULES (Zanzibar-style DSL)
 // ============================================
 
 /**
- * Initialize default permission schema
- * Call this once to set up:
- *   admin_of → ["create", "read", "update", "delete"]
- *   member_of → ["read"]
+ * Initialize permission rules for the example app
+ *
+ * Sets up Zanzibar-style rules:
+ *   resource.view = "owner->admin_of | owner->member_of"
+ *   resource.edit = "owner->admin_of"
+ *   resource.delete = "owner->admin_of"
+ *   booking.view = "parent->view | booker"
+ *   booking.cancel = "parent->edit | booker"
+ *   booking.delete = "parent->delete"
  */
-export const initializePermissions = mutation({
+export const initializePermissionRules = mutation({
   args: {},
   handler: async (ctx) => {
-    await zanvex.initializeDefaults(ctx);
+    // Resource permissions - check owner org's relations
+    await zanvex.definePermission(
+      ctx,
+      "resource",
+      "view",
+      "owner->admin_of | owner->member_of"
+    );
+    await zanvex.definePermission(ctx, "resource", "edit", "owner->admin_of");
+    await zanvex.definePermission(ctx, "resource", "delete", "owner->admin_of");
+
+    // Booking permissions - traverse through parent resource
+    await zanvex.definePermission(
+      ctx,
+      "booking",
+      "view",
+      "parent->view | booker"
+    );
+    await zanvex.definePermission(
+      ctx,
+      "booking",
+      "cancel",
+      "parent->edit | booker"
+    );
+    await zanvex.definePermission(ctx, "booking", "delete", "parent->delete");
   },
 });
 
 /**
- * List all permission schemas
+ * List all permission rules
  */
-export const listPermissionSchemas = query({
+export const listPermissionRules = query({
   args: {},
   handler: async (ctx) => {
-    return await zanvex.listPermissions(ctx);
+    return await zanvex.listPermissionRules(ctx);
   },
 });
 
 /**
- * Update permissions for a relation + objectType
+ * Define a permission rule
  */
-export const updatePermissionSchema = mutation({
+export const definePermissionRule = mutation({
   args: {
-    relation: v.string(),
     objectType: v.string(),
-    actions: v.array(v.string()),
+    permission: v.string(),
+    expression: v.string(),
   },
-  handler: async (ctx, { relation, objectType, actions }) => {
-    await zanvex.setPermissions(ctx, relation, objectType, actions);
+  handler: async (ctx, { objectType, permission, expression }) => {
+    await zanvex.definePermission(ctx, objectType, permission, expression);
+  },
+});
+
+/**
+ * Delete a permission rule
+ */
+export const deletePermissionRule = mutation({
+  args: {
+    objectType: v.string(),
+    permission: v.string(),
+  },
+  handler: async (ctx, { objectType, permission }) => {
+    await zanvex.deletePermissionRule(ctx, objectType, permission);
   },
 });
 
 /**
  * Get permissions a user has on a resource
- * Returns { create, read, update, delete } booleans
  */
 export const getResourcePermissions = query({
   args: {
@@ -670,7 +711,7 @@ export const canUserDoAction = query({
 // ============================================
 
 /**
- * Clear all app data AND Zanvex tuples
+ * Clear all app data AND Zanvex tuples + rules
  */
 export const clearAll = mutation({
   args: {},
@@ -691,6 +732,9 @@ export const clearAll = mutation({
     // Clear Zanvex tuples
     const zanvexDeleted = await zanvex.clearAll(ctx);
 
+    // Clear Zanvex permission rules
+    const rulesDeleted = await zanvex.clearAllRules(ctx);
+
     return {
       users: users.length,
       orgs: orgs.length,
@@ -698,6 +742,7 @@ export const clearAll = mutation({
       memberships: memberships.length,
       bookings: bookings.length,
       zanvexTuples: zanvexDeleted,
+      zanvexRules: rulesDeleted,
     };
   },
 });

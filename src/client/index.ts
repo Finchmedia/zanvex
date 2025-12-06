@@ -222,83 +222,84 @@ export function createZanvexClient(component: ComponentApi) {
     },
 
     // ============================================
-    // PERMISSION SCHEMA MANAGEMENT
+    // PERMISSION RULES (Zanzibar-style DSL)
     // ============================================
 
     /**
-     * Set what actions a relation grants for an object type
+     * Define a permission rule using DSL syntax
      *
-     * @param relation - The relation name (e.g., "admin_of", "member_of", "booker")
-     * @param objectType - The object type (e.g., "resource", "booking", "*" for all)
-     * @param actions - Array of allowed actions (e.g., ["read", "cancel"])
+     * DSL Syntax:
+     *   - "booker"              → Direct relation check
+     *   - "owner->admin_of"     → Follow 'owner' relation, check 'admin_of' on target
+     *   - "parent->edit | booker" → OR logic (either path grants access)
+     *
+     * @param objectType - The object type (e.g., "booking", "resource")
+     * @param permission - The permission name (e.g., "view", "edit", "cancel")
+     * @param expression - DSL expression (e.g., "parent->edit | booker")
      *
      * @example
-     * // Admins can do everything on all types
-     * await zanvex.setPermissions(ctx, "admin_of", "*", ["create", "read", "update", "delete"]);
+     * // Direct relation check (booker can cancel their own booking)
+     * await zanvex.definePermission(ctx, "booking", "cancel", "booker");
      *
-     * // Members can only read resources
-     * await zanvex.setPermissions(ctx, "member_of", "resource", ["read"]);
+     * // Computed permission (resource owner's admins can edit)
+     * await zanvex.definePermission(ctx, "resource", "edit", "owner->admin_of");
      *
-     * // Members can read and cancel bookings
-     * await zanvex.setPermissions(ctx, "member_of", "booking", ["read", "cancel"]);
-     *
-     * // Booker can manage their own booking
-     * await zanvex.setPermissions(ctx, "booker", "booking", ["read", "cancel"]);
+     * // OR logic (admin through hierarchy OR direct booker relation)
+     * await zanvex.definePermission(ctx, "booking", "cancel", "parent->edit | booker");
      */
-    setPermissions: (
+    definePermission: (
       ctx: MutationCtx,
-      relation: string,
       objectType: string,
-      actions: string[]
+      permission: string,
+      expression: string
     ) => {
-      return ctx.runMutation(component.permissions.setPermissions, {
-        relation,
+      return ctx.runMutation(component.rules.definePermission as any, {
         objectType,
-        actions,
+        permission,
+        expression,
       });
     },
 
     /**
-     * Get permissions for a relation (optionally for specific objectType)
+     * Get a specific permission rule
      */
-    getPermissions: (ctx: QueryCtx, relation: string, objectType?: string) => {
-      return ctx.runQuery(component.permissions.getPermissions, {
-        relation,
+    getPermissionRule: (
+      ctx: QueryCtx,
+      objectType: string,
+      permission: string
+    ) => {
+      return ctx.runQuery(component.rules.getPermissionRule as any, {
         objectType,
+        permission,
       });
     },
 
     /**
-     * List all permission schemas
+     * List all permission rules
      */
-    listPermissions: (ctx: QueryCtx) => {
-      return ctx.runQuery(component.permissions.listPermissions, {});
+    listPermissionRules: (ctx: QueryCtx) => {
+      return ctx.runQuery(component.rules.listPermissionRules as any, {});
     },
 
     /**
-     * Delete a permission schema
+     * Delete a permission rule
      */
-    deletePermissions: (
+    deletePermissionRule: (
       ctx: MutationCtx,
-      relation: string,
-      objectType?: string
+      objectType: string,
+      permission: string
     ) => {
-      return ctx.runMutation(component.permissions.deletePermissions, {
-        relation,
+      return ctx.runMutation(component.rules.deletePermissionRule as any, {
         objectType,
+        permission,
       });
     },
 
     /**
-     * Initialize default permissions
-     *
-     * Sets up:
-     *   admin_of on * : [create, read, update, delete]
-     *   member_of on * : [read]
-     *   booker on booking : [read, cancel]
+     * Clear all permission rules
      */
-    initializeDefaults: (ctx: MutationCtx) => {
-      return ctx.runMutation(component.permissions.initializeDefaults, {});
+    clearAllRules: (ctx: MutationCtx) => {
+      return ctx.runMutation(component.rules.clearAllRules as any, {});
     },
 
     // ============================================

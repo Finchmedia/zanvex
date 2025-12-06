@@ -1,338 +1,223 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server.js";
+import { query } from "./_generated/server.js";
 
 /**
- * Permission Schema Management
+ * Permission Checks (Zanzibar-style Recursive Traversal)
  *
- * These functions manage the permission schema - the rules that define
- * what each relation (admin_of, member_of, etc.) can do per object type.
+ * This module implements the core permission checking logic using
+ * schema-driven recursive traversal through the object graph.
  *
- * Example usage:
- *   setPermissions("admin_of", "*", ["create", "read", "update", "delete"])
- *   setPermissions("member_of", "resource", ["read"])
- *   setPermissions("member_of", "booking", ["read", "cancel"])
- *   setPermissions("booker", "booking", ["read", "cancel"])
+ * Key concepts:
+ * - Relations are stored tuples: (object, relation, subject)
+ * - Permissions are computed from rules defined in permission_rules table
+ * - If no rule exists for a permission, it's treated as a direct relation check
  *
- *   can(user, "cancel", booking) → checks if user's relation grants "cancel" for booking type
- *
- * objectType: "*" means "applies to all object types" (default/fallback)
+ * Example flow for can(user:daniel, cancel, booking:123):
+ *   1. Look up rule: booking.cancel = "parent->edit | booker"
+ *   2. Evaluate "booker": Direct tuple check → (booking:123, booker, user:daniel)?
+ *   3. Evaluate "parent->edit":
+ *      - Find booking's parent relation → resource:studio-a
+ *      - Recursively: can(daniel, edit, resource:studio-a)
+ *   4. Return true if any path succeeds
  */
 
-// Standard CRUD actions + custom actions
-export const ACTIONS = ["create", "read", "update", "delete"] as const;
-export type Action = (typeof ACTIONS)[number];
+const MAX_DEPTH = 10;
 
 /**
- * Helper to look up permissions for a (relation, objectType) pair
- * Falls back to wildcard "*" if no specific objectType match
- */
-async function lookupPermissions(
-  ctx: any,
-  relation: string,
-  objectType: string
-) {
-  // First try exact match
-  const exact = await ctx.db
-    .query("permission_schema")
-    .withIndex("by_relation_objectType", (q: any) =>
-      q.eq("relation", relation).eq("objectType", objectType)
-    )
-    .first();
-
-  if (exact) return exact;
-
-  // Fall back to wildcard
-  const wildcard = await ctx.db
-    .query("permission_schema")
-    .withIndex("by_relation_objectType", (q: any) =>
-      q.eq("relation", relation).eq("objectType", "*")
-    )
-    .first();
-
-  return wildcard;
-}
-
-/**
- * Set permissions for a relation + objectType (upsert)
+ * Check if a subject can perform an action/permission on an object
  *
- * If the (relation, objectType) already exists, updates its actions.
- * If not, creates a new entry.
+ * This is the main API for permission checks.
  *
- * @param relation - The relation name (e.g., "admin_of", "member_of", "booker")
- * @param objectType - The object type (e.g., "resource", "booking", "*" for all)
- * @param actions - Array of allowed actions (e.g., ["read", "cancel"])
- */
-export const setPermissions = mutation({
-  args: {
-    relation: v.string(),
-    objectType: v.optional(v.string()), // defaults to "*"
-    actions: v.array(v.string()),
-  },
-  returns: v.id("permission_schema"),
-  handler: async (ctx, { relation, objectType = "*", actions }) => {
-    // Check if (relation, objectType) already exists
-    const existing = await ctx.db
-      .query("permission_schema")
-      .withIndex("by_relation_objectType", (q) =>
-        q.eq("relation", relation).eq("objectType", objectType)
-      )
-      .first();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, { actions });
-      return existing._id;
-    }
-
-    return await ctx.db.insert("permission_schema", {
-      relation,
-      objectType,
-      actions,
-    });
-  },
-});
-
-/**
- * Get permissions for a relation (optionally for specific objectType)
- */
-export const getPermissions = query({
-  args: {
-    relation: v.string(),
-    objectType: v.optional(v.string()),
-  },
-  returns: v.union(
-    v.object({
-      relation: v.string(),
-      objectType: v.string(),
-      actions: v.array(v.string()),
-    }),
-    v.null()
-  ),
-  handler: async (ctx, { relation, objectType }) => {
-    let schema;
-
-    if (objectType) {
-      // Look up with fallback to wildcard
-      schema = await lookupPermissions(ctx, relation, objectType);
-    } else {
-      // Just get first match for this relation
-      schema = await ctx.db
-        .query("permission_schema")
-        .withIndex("by_relation", (q) => q.eq("relation", relation))
-        .first();
-    }
-
-    if (!schema) return null;
-
-    return {
-      relation: schema.relation,
-      objectType: schema.objectType,
-      actions: schema.actions,
-    };
-  },
-});
-
-/**
- * List all permission schemas
- */
-export const listPermissions = query({
-  args: {},
-  returns: v.array(
-    v.object({
-      relation: v.string(),
-      objectType: v.string(),
-      actions: v.array(v.string()),
-    })
-  ),
-  handler: async (ctx) => {
-    const schemas = await ctx.db.query("permission_schema").collect();
-    return schemas.map((s) => ({
-      relation: s.relation,
-      objectType: s.objectType,
-      actions: s.actions,
-    }));
-  },
-});
-
-/**
- * Delete a permission schema
- */
-export const deletePermissions = mutation({
-  args: {
-    relation: v.string(),
-    objectType: v.optional(v.string()),
-  },
-  returns: v.boolean(),
-  handler: async (ctx, { relation, objectType = "*" }) => {
-    const existing = await ctx.db
-      .query("permission_schema")
-      .withIndex("by_relation_objectType", (q) =>
-        q.eq("relation", relation).eq("objectType", objectType)
-      )
-      .first();
-
-    if (!existing) return false;
-
-    await ctx.db.delete(existing._id);
-    return true;
-  },
-});
-
-/**
- * Initialize default permissions
+ * @example
+ * // Can daniel cancel booking 123?
+ * const result = await zanvex.can(ctx, {
+ *   subject: { type: "user", id: "daniel" },
+ *   action: "cancel",
+ *   object: { type: "booking", id: "booking-123" },
+ * });
  *
- * Call this once to set up sensible defaults:
- *   admin_of on * : can do everything
- *   member_of on * : can only read
- *   booker on booking : can read and cancel
- */
-export const initializeDefaults = mutation({
-  args: {},
-  returns: v.null(),
-  handler: async (ctx) => {
-    // Check if already initialized
-    const existing = await ctx.db.query("permission_schema").first();
-    if (existing) return null;
-
-    // Set up defaults - admin can do everything on all types
-    await ctx.db.insert("permission_schema", {
-      relation: "admin_of",
-      objectType: "*",
-      actions: ["create", "read", "update", "delete"],
-    });
-
-    // member can only read on all types
-    await ctx.db.insert("permission_schema", {
-      relation: "member_of",
-      objectType: "*",
-      actions: ["read"],
-    });
-
-    // booker can read and cancel their own bookings
-    await ctx.db.insert("permission_schema", {
-      relation: "booker",
-      objectType: "booking",
-      actions: ["read", "cancel"],
-    });
-
-    return null;
-  },
-});
-
-/**
- * The main "can" check - uses permission schema with objectType
- *
- * This is the magic function that answers:
- * "Can this user perform this action on this object?"
- *
- * Steps:
- * 1. Find the path from subject to object (what relation grants access?)
- * 2. Look up (relation, objectType) in permission_schema (falls back to wildcard)
- * 3. Check if the requested action is in the actions array
+ * if (!result.allowed) {
+ *   throw new Error(`Forbidden: ${result.reason}`);
+ * }
  */
 export const can = query({
   args: {
     objectType: v.string(),
     objectId: v.string(),
-    action: v.string(),
+    action: v.string(), // The permission to check (e.g., "view", "edit", "cancel")
     subjectType: v.string(),
     subjectId: v.string(),
   },
   returns: v.object({
     allowed: v.boolean(),
     reason: v.optional(v.string()),
-    relation: v.optional(v.string()),
+    path: v.optional(v.array(v.string())), // Debug: traversal path taken
   }),
   handler: async (ctx, args) => {
-    // Step 1: Find how the subject is connected to the object
-    // First, direct check
-    const directRelations = await ctx.db
-      .query("relations")
-      .withIndex("by_subject", (q) =>
-        q.eq("subjectType", args.subjectType).eq("subjectId", args.subjectId)
-      )
-      .collect();
-
-    // Check if any direct relation grants access to this object
-    for (const rel of directRelations) {
-      if (rel.objectType === args.objectType && rel.objectId === args.objectId) {
-        // Direct relation found, check permissions with objectType
-        const schema = await lookupPermissions(ctx, rel.relation, args.objectType);
-
-        if (schema && schema.actions.includes(args.action)) {
-          return {
-            allowed: true,
-            reason: `Direct ${rel.relation} on ${args.objectType} grants ${args.action}`,
-            relation: rel.relation,
-          };
-        }
-      }
-    }
-
-    // Step 2: 1-hop traversal - find memberships
-    const memberships = directRelations.filter(
-      (t) =>
-        t.relation === "member_of" ||
-        t.relation === "admin_of" ||
-        t.relation === "editor" ||
-        t.relation === "viewer"
-    );
-
-    // Step 3: Check if any membership grants access via ownership
-    for (const membership of memberships) {
-      // Find if this org/group owns the target object
-      const ownershipRelations = await ctx.db
-        .query("relations")
-        .withIndex("by_object", (q) =>
-          q
-            .eq("objectType", args.objectType)
-            .eq("objectId", args.objectId)
-            .eq("relation", "owner")
-        )
-        .collect();
-
-      for (const ownership of ownershipRelations) {
-        if (
-          ownership.subjectType === membership.objectType &&
-          ownership.subjectId === membership.objectId
-        ) {
-          // Found path: subject → membership.relation → org → owner → object
-          // Check if membership.relation grants the action for this objectType
-          const schema = await lookupPermissions(
-            ctx,
-            membership.relation,
-            args.objectType
-          );
-
-          if (schema && schema.actions.includes(args.action)) {
-            return {
-              allowed: true,
-              reason: `${membership.relation} on ${args.objectType} via ${membership.objectType} grants ${args.action}`,
-              relation: membership.relation,
-            };
-          } else if (schema) {
-            // Has access but not for this action
-            return {
-              allowed: false,
-              reason: `${membership.relation} on ${args.objectType} does not grant ${args.action}`,
-              relation: membership.relation,
-            };
-          }
-        }
-      }
-    }
-
-    return {
-      allowed: false,
-      reason: "No access path found",
-    };
+    return await canRecursive(ctx, args, 0, []);
   },
 });
 
 /**
- * Check multiple actions at once for a user+object
+ * Internal recursive implementation of permission checking
+ */
+async function canRecursive(
+  ctx: any,
+  args: {
+    objectType: string;
+    objectId: string;
+    action: string;
+    subjectType: string;
+    subjectId: string;
+  },
+  depth: number,
+  path: string[]
+): Promise<{ allowed: boolean; reason?: string; path?: string[] }> {
+  // Prevent infinite loops
+  if (depth > MAX_DEPTH) {
+    return {
+      allowed: false,
+      reason: "Max traversal depth exceeded",
+      path,
+    };
+  }
+
+  const currentPath = [
+    ...path,
+    `${args.objectType}:${args.objectId}.${args.action}`,
+  ];
+
+  // 1. Look up permission rule for this (objectType, permission)
+  const rule = await ctx.db
+    .query("permission_rules")
+    .withIndex("by_type_permission", (q: any) =>
+      q.eq("objectType", args.objectType).eq("permission", args.action)
+    )
+    .first();
+
+  // 2. No rule? Default to direct relation check
+  if (!rule) {
+    const direct = await checkDirectTuple(ctx, {
+      objectType: args.objectType,
+      objectId: args.objectId,
+      relation: args.action, // Use action as relation name
+      subjectType: args.subjectType,
+      subjectId: args.subjectId,
+    });
+
+    return {
+      allowed: direct,
+      reason: direct
+        ? `Direct ${args.action} relation`
+        : `No ${args.action} relation found`,
+      path: currentPath,
+    };
+  }
+
+  // 3. Evaluate rules (OR logic - any matching rule grants access)
+  for (const part of rule.rules) {
+    if (part.type === "direct") {
+      // Check for direct relation tuple
+      const hasTuple = await checkDirectTuple(ctx, {
+        objectType: args.objectType,
+        objectId: args.objectId,
+        relation: part.relation!,
+        subjectType: args.subjectType,
+        subjectId: args.subjectId,
+      });
+
+      if (hasTuple) {
+        return {
+          allowed: true,
+          reason: `Direct ${part.relation} relation`,
+          path: currentPath,
+        };
+      }
+    } else if (part.type === "computed") {
+      // Find related objects via sourceRelation
+      const related = await ctx.db
+        .query("relations")
+        .withIndex("by_object", (q: any) =>
+          q
+            .eq("objectType", args.objectType)
+            .eq("objectId", args.objectId)
+            .eq("relation", part.sourceRelation)
+        )
+        .collect();
+
+      // Recursively check permission on each related object
+      for (const rel of related) {
+        const result = await canRecursive(
+          ctx,
+          {
+            objectType: rel.subjectType,
+            objectId: rel.subjectId,
+            action: part.targetPermission!,
+            subjectType: args.subjectType,
+            subjectId: args.subjectId,
+          },
+          depth + 1,
+          currentPath
+        );
+
+        if (result.allowed) {
+          return {
+            allowed: true,
+            reason: `${part.sourceRelation}->${part.targetPermission}`,
+            path: result.path,
+          };
+        }
+      }
+    }
+  }
+
+  return {
+    allowed: false,
+    reason: "No matching rule granted access",
+    path: currentPath,
+  };
+}
+
+/**
+ * Check if a direct relation tuple exists
+ */
+async function checkDirectTuple(
+  ctx: any,
+  args: {
+    objectType: string;
+    objectId: string;
+    relation: string;
+    subjectType: string;
+    subjectId: string;
+  }
+): Promise<boolean> {
+  const tuple = await ctx.db
+    .query("relations")
+    .withIndex("by_tuple", (q: any) =>
+      q
+        .eq("objectType", args.objectType)
+        .eq("objectId", args.objectId)
+        .eq("relation", args.relation)
+        .eq("subjectType", args.subjectType)
+        .eq("subjectId", args.subjectId)
+    )
+    .first();
+
+  return !!tuple;
+}
+
+/**
+ * Get all permissions a subject has on an object
  *
- * Returns which actions are allowed (useful for UI)
- * Now supports custom actions beyond CRUD
+ * Checks common CRUD permissions plus any custom permissions defined in rules.
+ * Returns which actions are allowed.
+ *
+ * @example
+ * const perms = await zanvex.getPermissionsForObject(ctx, {
+ *   subject: { type: "user", id: "daniel" },
+ *   object: { type: "booking", id: "booking-123" },
+ * });
+ * // { view: true, edit: false, delete: false, cancel: true, actions: ["view", "cancel"] }
  */
 export const getPermissionsForObject = query({
   args: {
@@ -342,97 +227,76 @@ export const getPermissionsForObject = query({
     subjectId: v.string(),
   },
   returns: v.object({
+    // Standard CRUD permissions
     create: v.boolean(),
     read: v.boolean(),
     update: v.boolean(),
     delete: v.boolean(),
-    cancel: v.boolean(), // Added for bookings
-    actions: v.array(v.string()), // Full list of allowed actions
-    relation: v.optional(v.string()),
+    // Common custom permissions
+    view: v.boolean(),
+    edit: v.boolean(),
+    cancel: v.boolean(),
+    // Full list of allowed actions
+    actions: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
-    const result = {
-      create: false,
-      read: false,
-      update: false,
-      delete: false,
-      cancel: false,
-      actions: [] as string[],
-      relation: undefined as string | undefined,
-    };
+    // Standard permissions to check
+    const standardPermissions = [
+      "create",
+      "read",
+      "update",
+      "delete",
+      "view",
+      "edit",
+      "cancel",
+    ];
 
-    // Find the relation that grants access
-    // First, direct check
-    const directRelations = await ctx.db
-      .query("relations")
-      .withIndex("by_subject", (q) =>
-        q.eq("subjectType", args.subjectType).eq("subjectId", args.subjectId)
+    // Also get any custom permissions defined for this object type
+    const rules = await ctx.db
+      .query("permission_rules")
+      .withIndex("by_type_permission", (q: any) =>
+        q.eq("objectType", args.objectType)
       )
       .collect();
 
-    // Check direct relations
-    for (const rel of directRelations) {
-      if (rel.objectType === args.objectType && rel.objectId === args.objectId) {
-        const schema = await lookupPermissions(ctx, rel.relation, args.objectType);
+    const customPermissions = rules.map((r: any) => r.permission);
+    const allPermissions = [
+      ...new Set([...standardPermissions, ...customPermissions]),
+    ];
 
-        if (schema) {
-          result.relation = rel.relation;
-          result.actions = schema.actions;
-          result.create = schema.actions.includes("create");
-          result.read = schema.actions.includes("read");
-          result.update = schema.actions.includes("update");
-          result.delete = schema.actions.includes("delete");
-          result.cancel = schema.actions.includes("cancel");
-          return result;
-        }
+    // Check each permission
+    const results: Record<string, boolean> = {};
+    const allowedActions: string[] = [];
+
+    for (const permission of allPermissions) {
+      const result = await canRecursive(
+        ctx,
+        {
+          objectType: args.objectType,
+          objectId: args.objectId,
+          action: permission,
+          subjectType: args.subjectType,
+          subjectId: args.subjectId,
+        },
+        0,
+        []
+      );
+
+      results[permission] = result.allowed;
+      if (result.allowed) {
+        allowedActions.push(permission);
       }
     }
 
-    // 1-hop traversal
-    const memberships = directRelations.filter(
-      (t) =>
-        t.relation === "member_of" ||
-        t.relation === "admin_of" ||
-        t.relation === "editor" ||
-        t.relation === "viewer"
-    );
-
-    for (const membership of memberships) {
-      const ownershipRelations = await ctx.db
-        .query("relations")
-        .withIndex("by_object", (q) =>
-          q
-            .eq("objectType", args.objectType)
-            .eq("objectId", args.objectId)
-            .eq("relation", "owner")
-        )
-        .collect();
-
-      for (const ownership of ownershipRelations) {
-        if (
-          ownership.subjectType === membership.objectType &&
-          ownership.subjectId === membership.objectId
-        ) {
-          const schema = await lookupPermissions(
-            ctx,
-            membership.relation,
-            args.objectType
-          );
-
-          if (schema) {
-            result.relation = membership.relation;
-            result.actions = schema.actions;
-            result.create = schema.actions.includes("create");
-            result.read = schema.actions.includes("read");
-            result.update = schema.actions.includes("update");
-            result.delete = schema.actions.includes("delete");
-            result.cancel = schema.actions.includes("cancel");
-            return result;
-          }
-        }
-      }
-    }
-
-    return result;
+    return {
+      create: results["create"] ?? false,
+      read: results["read"] ?? false,
+      update: results["update"] ?? false,
+      delete: results["delete"] ?? false,
+      view: results["view"] ?? false,
+      edit: results["edit"] ?? false,
+      cancel: results["cancel"] ?? false,
+      actions: allowedActions,
+    };
   },
 });

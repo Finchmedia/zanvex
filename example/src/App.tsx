@@ -65,8 +65,8 @@ function TestHarness() {
   // Queries - Zanvex Tuples
   const allTuples = useQuery(api.app.getAllTuples) ?? [];
 
-  // Queries - Permission Schema
-  const permissionSchemas = useQuery(api.app.listPermissionSchemas) ?? [];
+  // Queries - Permission Rules (Zanzibar-style)
+  const permissionRules = useQuery(api.app.listPermissionRules) ?? [];
 
   // Queries - Resource Permissions
   const resourcePermissions = useQuery(
@@ -117,15 +117,16 @@ function TestHarness() {
   const deleteBooking = useMutation(api.app.deleteBooking);
   const cancelBooking = useMutation(api.app.cancelBooking);
   const clearAll = useMutation(api.app.clearAll);
-  const initializePermissions = useMutation(api.app.initializePermissions);
-  const updatePermissionSchema = useMutation(api.app.updatePermissionSchema);
+  const initializePermissionRules = useMutation(api.app.initializePermissionRules);
+  const definePermissionRule = useMutation(api.app.definePermissionRule);
+  const deletePermissionRule = useMutation(api.app.deletePermissionRule);
 
-  // Initialize permissions on first load
+  // Initialize permission rules on first load
   useEffect(() => {
-    if (permissionSchemas.length === 0) {
-      initializePermissions();
+    if (permissionRules.length === 0) {
+      initializePermissionRules();
     }
-  }, [permissionSchemas.length, initializePermissions]);
+  }, [permissionRules.length, initializePermissionRules]);
 
   // Handlers
   const handleCreateUser = async () => {
@@ -600,7 +601,7 @@ function TestHarness() {
           <Shield className="size-5" />
           <h2 className="text-xl font-semibold">Permission Checks</h2>
           <span className="text-muted-foreground text-sm">
-            (Zanvex with 1-hop traversal)
+            (Zanzibar-style recursive traversal)
           </span>
         </div>
 
@@ -853,10 +854,10 @@ function TestHarness() {
         {selectedUserId && selectedResourceId && (
           <Card className="mt-4">
             <CardHeader>
-              <CardTitle className="text-base">1-Hop Traversal Path</CardTitle>
+              <CardTitle className="text-base">Recursive Traversal Path</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 text-sm font-mono">
+              <div className="flex items-center gap-2 text-sm font-mono flex-wrap">
                 <span className="px-2 py-1 bg-green-500/20 rounded">
                   user:{users.find((u) => u._id === selectedUserId)?.name}
                 </span>
@@ -875,90 +876,91 @@ function TestHarness() {
                   resource:
                   {resources.find((r) => r._id === selectedResourceId)?.name}
                 </span>
+                {selectedBookingId && (
+                  <>
+                    <ArrowRight className="size-4" />
+                    <span className="text-muted-foreground">parent?</span>
+                    <ArrowRight className="size-4" />
+                    <span className="px-2 py-1 bg-purple-500/20 rounded">
+                      booking:
+                      {bookings.find((b) => b._id === selectedBookingId)?.title}
+                    </span>
+                  </>
+                )}
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Rules like <code className="bg-muted px-1 rounded">booking.cancel = "parent-&gt;edit | booker"</code> enable multi-hop traversal
+              </p>
             </CardContent>
           </Card>
         )}
       </section>
 
-      {/* Section 4: Permission Schema Editor */}
+      {/* Section 4: Permission Rules (Zanzibar DSL) */}
       <section>
         <div className="flex items-center gap-2 mb-4">
           <Settings className="size-5" />
-          <h2 className="text-xl font-semibold">Permission Schema</h2>
+          <h2 className="text-xl font-semibold">Permission Rules</h2>
           <span className="text-muted-foreground text-sm">
-            (Define what each relation can do)
+            (Zanzibar-style DSL expressions)
           </span>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Relation → Actions</CardTitle>
+            <CardTitle className="text-base">objectType.permission = expression</CardTitle>
             <CardDescription>
-              Click actions to toggle. Changes are saved immediately.
+              DSL: <code className="bg-muted px-1 rounded">relation</code> = direct check,{" "}
+              <code className="bg-muted px-1 rounded">rel-&gt;perm</code> = follow relation & check permission,{" "}
+              <code className="bg-muted px-1 rounded">|</code> = OR
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {permissionSchemas.length === 0 ? (
+            <div className="space-y-2">
+              {permissionRules.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-muted-foreground mb-2">
-                    No permission schema defined
+                    No permission rules defined
                   </p>
-                  <Button size="sm" onClick={() => initializePermissions()}>
+                  <Button size="sm" onClick={() => initializePermissionRules()}>
                     <RefreshCw className="size-4 mr-2" />
                     Initialize Defaults
                   </Button>
                 </div>
               ) : (
-                permissionSchemas.map((schema) => (
+                permissionRules.map((rule) => (
                   <div
-                    key={`${schema.relation}-${schema.objectType}`}
-                    className="flex items-center gap-4 p-3 bg-secondary rounded-lg"
+                    key={`${rule.objectType}-${rule.permission}`}
+                    className="flex items-center gap-3 p-3 bg-secondary rounded-lg font-mono text-sm"
                   >
-                    <div className="flex items-center gap-2 min-w-[180px]">
-                      <span className="font-mono font-medium text-sm">
-                        {schema.relation}
-                      </span>
-                      <span className="text-xs text-muted-foreground">on</span>
-                      <span className="text-xs px-1.5 py-0.5 bg-primary/20 rounded">
-                        {schema.objectType}
-                      </span>
-                    </div>
-                    <ArrowRight className="size-4 text-muted-foreground" />
-                    <div className="flex gap-2 flex-wrap">
-                      {(["create", "read", "update", "delete", "cancel"] as const).map(
-                        (action) => {
-                          const isEnabled = schema.actions.includes(action);
-                          return (
-                            <button
-                              key={action}
-                              onClick={() => {
-                                const newActions = isEnabled
-                                  ? schema.actions.filter((a) => a !== action)
-                                  : [...schema.actions, action];
-                                updatePermissionSchema({
-                                  relation: schema.relation,
-                                  objectType: schema.objectType,
-                                  actions: newActions,
-                                });
-                              }}
-                              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                                isEnabled
-                                  ? "bg-primary text-primary-foreground"
-                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-                              }`}
-                            >
-                              {action}
-                            </button>
-                          );
-                        }
-                      )}
-                    </div>
+                    <span className="text-blue-500">{rule.objectType}</span>
+                    <span className="text-muted-foreground">.</span>
+                    <span className="text-yellow-500">{rule.permission}</span>
+                    <span className="text-muted-foreground">=</span>
+                    <span className="text-green-500 flex-1">{rule.expression}</span>
+                    <Trash2
+                      className="size-4 opacity-50 hover:opacity-100 hover:text-destructive cursor-pointer shrink-0"
+                      onClick={() =>
+                        deletePermissionRule({
+                          objectType: rule.objectType,
+                          permission: rule.permission,
+                        })
+                      }
+                    />
                   </div>
                 ))
               )}
             </div>
+            {permissionRules.length > 0 && (
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-xs text-muted-foreground mb-2">Examples:</p>
+                <ul className="text-xs text-muted-foreground space-y-1 font-mono">
+                  <li><span className="text-green-500">booker</span> - direct relation check</li>
+                  <li><span className="text-green-500">owner-&gt;admin_of</span> - follow owner, check admin_of</li>
+                  <li><span className="text-green-500">parent-&gt;edit | booker</span> - OR: parent's edit OR booker</li>
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
       </section>

@@ -88,21 +88,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           subjectId: string;
           subjectType: string;
         },
-        { allowed: boolean; reason?: string; relation?: string },
-        Name
-      >;
-      deletePermissions: FunctionReference<
-        "mutation",
-        "internal",
-        { objectType?: string; relation: string },
-        boolean,
-        Name
-      >;
-      getPermissions: FunctionReference<
-        "query",
-        "internal",
-        { objectType?: string; relation: string },
-        { actions: Array<string>; objectType: string; relation: string } | null,
+        { allowed: boolean; path?: Array<string>; reason?: string },
         Name
       >;
       getPermissionsForObject: FunctionReference<
@@ -119,31 +105,48 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           cancel: boolean;
           create: boolean;
           delete: boolean;
+          edit: boolean;
           read: boolean;
-          relation?: string;
           update: boolean;
+          view: boolean;
         },
         Name
       >;
-      initializeDefaults: FunctionReference<
+    };
+    rules: {
+      clearAllRules: FunctionReference<
         "mutation",
         "internal",
         {},
-        null,
+        number,
         Name
       >;
-      listPermissions: FunctionReference<
+      definePermission: FunctionReference<
+        "mutation",
+        "internal",
+        { expression: string; objectType: string; permission: string },
+        string,
+        Name
+      >;
+      deletePermissionRule: FunctionReference<
+        "mutation",
+        "internal",
+        { objectType: string; permission: string },
+        boolean,
+        Name
+      >;
+      getPermissionRule: FunctionReference<
+        "query",
+        "internal",
+        { objectType: string; permission: string },
+        { expression: string; objectType: string; permission: string } | null,
+        Name
+      >;
+      listPermissionRules: FunctionReference<
         "query",
         "internal",
         {},
-        Array<{ actions: Array<string>; objectType: string; relation: string }>,
-        Name
-      >;
-      setPermissions: FunctionReference<
-        "mutation",
-        "internal",
-        { actions: Array<string>; objectType?: string; relation: string },
-        string,
+        Array<{ expression: string; objectType: string; permission: string }>,
         Name
       >;
     };
