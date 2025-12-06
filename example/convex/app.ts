@@ -707,6 +707,114 @@ export const canUserDoAction = query({
 });
 
 // ============================================
+// OBJECT TYPES SCHEMA REGISTRY
+// ============================================
+
+/**
+ * Register or update an object type with its relations
+ */
+export const registerObjectType = mutation({
+  args: {
+    name: v.string(),
+    description: v.optional(v.string()),
+    relations: v.array(
+      v.object({
+        name: v.string(),
+        targetType: v.string(),
+        description: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    return await zanvex.registerObjectType(ctx, args);
+  },
+});
+
+/**
+ * List all object types
+ */
+export const listObjectTypes = query({
+  args: {},
+  handler: async (ctx) => {
+    return await zanvex.listObjectTypes(ctx);
+  },
+});
+
+/**
+ * Get a specific object type
+ */
+export const getObjectType = query({
+  args: { name: v.string() },
+  handler: async (ctx, { name }) => {
+    return await zanvex.getObjectType(ctx, name);
+  },
+});
+
+/**
+ * Delete an object type
+ */
+export const deleteObjectType = mutation({
+  args: { name: v.string() },
+  handler: async (ctx, { name }) => {
+    return await zanvex.deleteObjectType(ctx, name);
+  },
+});
+
+/**
+ * Get valid relations for an object type
+ */
+export const getRelationsForType = query({
+  args: { objectType: v.string() },
+  handler: async (ctx, { objectType }) => {
+    return await zanvex.getRelationsForType(ctx, objectType);
+  },
+});
+
+/**
+ * Initialize example object types for the demo app
+ */
+export const initializeObjectTypes = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // User type - no relations (leaf node)
+    await zanvex.registerObjectType(ctx, {
+      name: "user",
+      description: "A user of the system",
+      relations: [],
+    });
+
+    // Org type - has admin_of and member_of relations to users
+    await zanvex.registerObjectType(ctx, {
+      name: "org",
+      description: "An organization",
+      relations: [
+        { name: "admin_of", targetType: "user", description: "User is an admin of this org" },
+        { name: "member_of", targetType: "user", description: "User is a member of this org" },
+      ],
+    });
+
+    // Resource type - owned by an org
+    await zanvex.registerObjectType(ctx, {
+      name: "resource",
+      description: "A bookable resource like a studio",
+      relations: [
+        { name: "owner", targetType: "org", description: "The org that owns this resource" },
+      ],
+    });
+
+    // Booking type - has parent resource and booker user
+    await zanvex.registerObjectType(ctx, {
+      name: "booking",
+      description: "A booking for a resource",
+      relations: [
+        { name: "parent", targetType: "resource", description: "The resource being booked" },
+        { name: "booker", targetType: "user", description: "The user who made the booking" },
+      ],
+    });
+  },
+});
+
+// ============================================
 // RESET
 // ============================================
 
@@ -735,6 +843,9 @@ export const clearAll = mutation({
     // Clear Zanvex permission rules
     const rulesDeleted = await zanvex.clearAllRules(ctx);
 
+    // Clear Zanvex object types
+    const objectTypesDeleted = await zanvex.clearAllObjectTypes(ctx);
+
     return {
       users: users.length,
       orgs: orgs.length,
@@ -743,6 +854,7 @@ export const clearAll = mutation({
       bookings: bookings.length,
       zanvexTuples: zanvexDeleted,
       zanvexRules: rulesDeleted,
+      zanvexObjectTypes: objectTypesDeleted,
     };
   },
 });

@@ -12,6 +12,28 @@ import { v } from "convex/values";
  * - (org:acme, member_of, user:daniel)       → "acme has member daniel"
  */
 export default defineSchema({
+  /**
+   * Object Types Schema Registry
+   *
+   * Stores the schema definition for object types and their valid relations.
+   * This enables schema-driven permission traversal and UI validation.
+   *
+   * Example:
+   *   { name: "resource", relations: [{ name: "owner", targetType: "org" }] }
+   *   { name: "booking", relations: [{ name: "parent", targetType: "resource" }, { name: "booker", targetType: "user" }] }
+   */
+  object_types: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    relations: v.array(
+      v.object({
+        name: v.string(),
+        targetType: v.string(),
+        description: v.optional(v.string()),
+      })
+    ),
+  }).index("by_name", ["name"]),
+
   relations: defineTable({
     // The object being accessed (e.g., "resource", "org")
     objectType: v.string(),

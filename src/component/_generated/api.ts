@@ -10,6 +10,7 @@
 
 import type * as check from "../check.js";
 import type * as dsl from "../dsl.js";
+import type * as objectTypes from "../objectTypes.js";
 import type * as permissions from "../permissions.js";
 import type * as rules from "../rules.js";
 import type * as tuples from "../tuples.js";
@@ -24,6 +25,7 @@ import { anyApi, componentsGeneric } from "convex/server";
 const fullApi: ApiFromModules<{
   check: typeof check;
   dsl: typeof dsl;
+  objectTypes: typeof objectTypes;
   permissions: typeof permissions;
   rules: typeof rules;
   tuples: typeof tuples;

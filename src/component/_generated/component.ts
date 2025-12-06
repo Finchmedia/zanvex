@@ -77,6 +77,81 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         Name
       >;
     };
+    objectTypes: {
+      clearAllObjectTypes: FunctionReference<
+        "mutation",
+        "internal",
+        {},
+        number,
+        Name
+      >;
+      deleteObjectType: FunctionReference<
+        "mutation",
+        "internal",
+        { name: string },
+        boolean,
+        Name
+      >;
+      getObjectType: FunctionReference<
+        "query",
+        "internal",
+        { name: string },
+        {
+          description?: string;
+          name: string;
+          relations: Array<{
+            description?: string;
+            name: string;
+            targetType: string;
+          }>;
+        } | null,
+        Name
+      >;
+      getPermissionsForType: FunctionReference<
+        "query",
+        "internal",
+        { objectType: string },
+        Array<string>,
+        Name
+      >;
+      getRelationsForType: FunctionReference<
+        "query",
+        "internal",
+        { objectType: string },
+        Array<{ description?: string; name: string; targetType: string }>,
+        Name
+      >;
+      listObjectTypes: FunctionReference<
+        "query",
+        "internal",
+        {},
+        Array<{
+          description?: string;
+          name: string;
+          relations: Array<{
+            description?: string;
+            name: string;
+            targetType: string;
+          }>;
+        }>,
+        Name
+      >;
+      registerObjectType: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          description?: string;
+          name: string;
+          relations: Array<{
+            description?: string;
+            name: string;
+            targetType: string;
+          }>;
+        },
+        string,
+        Name
+      >;
+    };
     permissions: {
       can: FunctionReference<
         "query",

@@ -303,6 +303,79 @@ export function createZanvexClient(component: ComponentApi) {
     },
 
     // ============================================
+    // OBJECT TYPES SCHEMA REGISTRY
+    // ============================================
+
+    /**
+     * Register or update an object type with its relations
+     *
+     * @example
+     * await zanvex.registerObjectType(ctx, {
+     *   name: "resource",
+     *   description: "A bookable resource like a studio or room",
+     *   relations: [
+     *     { name: "owner", targetType: "org", description: "The org that owns this resource" }
+     *   ]
+     * });
+     */
+    registerObjectType: (
+      ctx: MutationCtx,
+      args: {
+        name: string;
+        description?: string;
+        relations: Array<{
+          name: string;
+          targetType: string;
+          description?: string;
+        }>;
+      }
+    ) => {
+      return ctx.runMutation(component.objectTypes.registerObjectType, args);
+    },
+
+    /**
+     * Get a specific object type by name
+     */
+    getObjectType: (ctx: QueryCtx, name: string) => {
+      return ctx.runQuery(component.objectTypes.getObjectType, { name });
+    },
+
+    /**
+     * List all registered object types
+     */
+    listObjectTypes: (ctx: QueryCtx) => {
+      return ctx.runQuery(component.objectTypes.listObjectTypes, {});
+    },
+
+    /**
+     * Delete an object type
+     */
+    deleteObjectType: (ctx: MutationCtx, name: string) => {
+      return ctx.runMutation(component.objectTypes.deleteObjectType, { name });
+    },
+
+    /**
+     * Clear all object types
+     */
+    clearAllObjectTypes: (ctx: MutationCtx) => {
+      return ctx.runMutation(component.objectTypes.clearAllObjectTypes, {});
+    },
+
+    /**
+     * Get valid relations for an object type (for UI dropdowns)
+     */
+    getRelationsForType: (ctx: QueryCtx, objectType: string) => {
+      return ctx.runQuery(component.objectTypes.getRelationsForType, { objectType });
+    },
+
+    /**
+     * Get all permissions defined for an object type
+     */
+    getPermissionsForType: (ctx: QueryCtx, objectType: string) => {
+      return ctx.runQuery(component.objectTypes.getPermissionsForType, { objectType });
+    },
+
+    // ============================================
     // THE MAGIC: ACTION-BASED PERMISSION CHECKS
     // ============================================
 

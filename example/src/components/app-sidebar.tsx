@@ -63,8 +63,8 @@ const navData: { sections: NavSection[] } = {
     {
       title: "Schema",
       items: [
-        { title: "Object Types", icon: Boxes, page: "object-types", disabled: true },
-        { title: "Graph View", icon: Network, page: "graph", disabled: true },
+        { title: "Object Types", icon: Boxes, page: "object-types" },
+        { title: "Graph View", icon: Network, page: "graph" },
       ],
     },
   ],
