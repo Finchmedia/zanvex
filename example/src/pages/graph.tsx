@@ -13,7 +13,7 @@ import {
   MarkerType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import dagre from "dagre";
+import { tree, hierarchy } from "d3-hierarchy";
 import { Network } from "lucide-react";
 
 import {
@@ -24,33 +24,48 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// Dagre layout configuration
-const dagreGraph = new dagre.graphlib.Graph();
-dagreGraph.setDefaultEdgeLabel(() => ({}));
-
 const nodeWidth = 180;
 const nodeHeight = 80;
 
 const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
-  dagreGraph.setGraph({ rankdir: "BT", nodesep: 100, ranksep: 150 });
+  // Build hierarchy tree from nodes and edges
+  const nodeMap = new Map(nodes.map(n => [n.id, { ...n, children: [] }]));
 
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  // Build parent-child relationships from edges
+  edges.forEach(edge => {
+    const parent = nodeMap.get(edge.source);
+    const child = nodeMap.get(edge.target);
+    if (parent && child) {
+      parent.children.push(child);
+    }
   });
 
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
+  // Find root node (node with no incoming edges)
+  const targetIds = new Set(edges.map(e => e.target));
+  const rootNode = nodes.find(n => !targetIds.has(n.id));
 
-  dagre.layout(dagreGraph);
+  if (!rootNode) return { nodes, edges };
 
-  const layoutedNodes = nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
+  // Create hierarchy
+  const root = hierarchy(nodeMap.get(rootNode.id));
+
+  // Create tree layout
+  const treeLayout = tree()
+    .nodeSize([nodeWidth + 100, nodeHeight + 150]); // horizontal and vertical spacing
+
+  // Apply layout
+  treeLayout(root);
+
+  // Convert back to React Flow nodes with positions
+  const layoutedNodes = nodes.map(node => {
+    const treeNode = root.descendants().find(d => d.data.id === node.id);
+    if (!treeNode) return node;
+
     return {
       ...node,
       position: {
-        x: nodeWithPosition.x - nodeWidth / 2,
-        y: nodeWithPosition.y - nodeHeight / 2,
+        x: treeNode.x,
+        y: treeNode.y,
       },
     };
   });
@@ -98,7 +113,7 @@ export function GraphPage() {
           source: relation.targetType,
           target: type.name,
           label: relation.name,
-          type: "default",
+          type: "smoothstep",
           animated: false,
           markerEnd: {
             type: MarkerType.ArrowClosed,

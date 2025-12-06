@@ -15,6 +15,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SelectionProvider } from "@/contexts/selection-context";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { AppDataPage } from "@/pages/app-data";
 import { TuplesPage } from "@/pages/tuples";
 import { PermissionRulesPage } from "@/pages/permission-rules";
@@ -115,31 +116,34 @@ function App() {
       <SidebarProvider>
         <AppSidebar currentPage={currentPage} onPageChange={setCurrentPage} />
         <SidebarInset>
-          <header className="bg-background sticky top-0 flex h-16 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                {metadata.breadcrumbs.map((crumb, index) => (
-                  <div key={index} className="contents">
-                    {index > 0 && (
-                      <BreadcrumbSeparator className="hidden md:block" />
-                    )}
-                    <BreadcrumbItem
-                      className={index === 0 ? "hidden md:block" : undefined}
-                    >
-                      {crumb.href ? (
-                        <BreadcrumbLink href={crumb.href}>
-                          {crumb.label}
-                        </BreadcrumbLink>
-                      ) : (
-                        <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+          <header className="bg-background sticky top-0 flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger className="-ml-1" />
+              <Separator orientation="vertical" className="mr-2 h-4" />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  {metadata.breadcrumbs.map((crumb, index) => (
+                    <div key={index} className="contents">
+                      {index > 0 && (
+                        <BreadcrumbSeparator className="hidden md:block" />
                       )}
-                    </BreadcrumbItem>
-                  </div>
-                ))}
-              </BreadcrumbList>
-            </Breadcrumb>
+                      <BreadcrumbItem
+                        className={index === 0 ? "hidden md:block" : undefined}
+                      >
+                        {crumb.href ? (
+                          <BreadcrumbLink href={crumb.href}>
+                            {crumb.label}
+                          </BreadcrumbLink>
+                        ) : (
+                          <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                        )}
+                      </BreadcrumbItem>
+                    </div>
+                  ))}
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
+            <ThemeToggle />
           </header>
           <div className="flex flex-1 flex-col gap-4 p-4">{renderPage()}</div>
         </SidebarInset>
