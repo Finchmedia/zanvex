@@ -32,7 +32,7 @@ const nodeWidth = 180;
 const nodeHeight = 80;
 
 const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
-  dagreGraph.setGraph({ rankdir: "TB", nodesep: 100, ranksep: 150 });
+  dagreGraph.setGraph({ rankdir: "BT", nodesep: 100, ranksep: 150 });
 
   nodes.forEach((node) => {
     dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
@@ -95,8 +95,8 @@ export function GraphPage() {
       type.relations.forEach((relation) => {
         edges.push({
           id: `${type.name}-${relation.name}-${relation.targetType}`,
-          source: type.name,
-          target: relation.targetType,
+          source: relation.targetType,
+          target: type.name,
           label: relation.name,
           type: "default",
           animated: false,
