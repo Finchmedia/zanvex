@@ -18,6 +18,7 @@ import { mutation } from "./_generated/server.js";
 import { api } from "./_generated/api.js";
 import { createZanvexClient } from "@mrfinch/zanvex";
 import { components } from "./_generated/api.js";
+import { v } from "convex/values";
 
 const zanvex = createZanvexClient(components.zanvex);
 
@@ -119,13 +120,20 @@ export const seedPermissionRules = mutation({
  */
 export const seedAll = mutation({
   args: {},
-  handler: async (ctx) => {
+  returns: v.object({
+    permissions: v.object({ total: v.number() }),
+    relations: v.object({ total: v.number() }),
+  }),
+  handler: async (ctx): Promise<{
+    permissions: { total: number };
+    relations: { total: number };
+  }> => {
     console.log("🌱 Starting Zanvex database seed...\n");
 
     // Step 1: Seed catalogs
     console.log("📋 Seeding catalogs...");
-    const permResult = await ctx.runMutation(api.seed.seedPermissions, {});
-    const relResult = await ctx.runMutation(api.seed.seedRelations, {});
+    const permResult: { total: number } = await ctx.runMutation(api.seed.seedPermissions, {});
+    const relResult: { total: number } = await ctx.runMutation(api.seed.seedRelations, {});
 
     // Step 2: Seed object types
     console.log("\n📦 Seeding object types...");

@@ -129,14 +129,16 @@ Or edit `example/convex/seed.ts` and add them to the arrays.
 To reset everything:
 
 ```bash
-# Clear all data (app tables + Zanvex)
+# Clear all data (app tables + Zanvex catalogs + tuples + rules)
 npx convex run app:clearAll
-
-# Clear only catalogs
-npx convex run seed:clearCatalogs
 ```
 
-**Warning:** These operations are destructive and cannot be undone!
+**Warning:** This operation is destructive and cannot be undone! It will delete:
+- All app data (users, orgs, resources, bookings)
+- All Zanvex tuples
+- All permission rules
+- All object types
+- Note: Permission and relation catalogs are preserved (use re-seeding if needed)
 
 ## Using the Convex Dashboard
 
@@ -150,9 +152,10 @@ You can also run these functions directly from the Convex Dashboard:
 ## Idempotency
 
 All seed functions are **idempotent** - safe to run multiple times:
-- Existing entries won't be duplicated
-- New entries will be added
-- The function returns counts of created vs. existing items
+- Existing entries won't be duplicated (handled by component API)
+- `registerPermission()` and `registerRelationName()` are upserts
+- Re-running updates existing entries and ensures they're active
+- Object types and rules are also idempotent (won't create duplicates)
 
 ## Architecture
 
