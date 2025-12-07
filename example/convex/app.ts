@@ -706,6 +706,27 @@ export const canUserDoAction = query({
   },
 });
 
+/**
+ * Check permission with detailed traversal path
+ *
+ * For the permission tester graph visualization
+ */
+export const canWithPath = query({
+  args: {
+    userId: v.id("users"),
+    action: v.string(),
+    objectType: v.string(),
+    objectId: v.string(),
+  },
+  handler: async (ctx, { userId, action, objectType, objectId }) => {
+    return await zanvex.canWithPath(ctx, {
+      subject: { type: "user", id: userId },
+      action,
+      object: { type: objectType, id: objectId },
+    });
+  },
+});
+
 // ============================================
 // PERMISSION CATALOG
 // ============================================

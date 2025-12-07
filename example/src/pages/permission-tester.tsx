@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "@convex/_generated/api";
 import {
@@ -7,55 +8,71 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Check, X, Shield, Calendar, ArrowRight } from "lucide-react";
-import { useSelection } from "@/contexts/selection-context";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { CheckCircle2, XCircle, Shield } from "lucide-react";
+import { TraversalGraph } from "@/components/traversal-graph";
+import { cn } from "@/lib/utils";
+import type { Id } from "@convex/_generated/dataModel";
 
 export function PermissionTesterPage() {
-  const {
-    selectedUserId,
-    selectedOrgId,
-    selectedResourceId,
-    selectedBookingId,
-  } = useSelection();
+  const [userId, setUserId] = useState<Id<"users"> | null>(null);
+  const [action, setAction] = useState<string | null>(null);
+  const [objectRef, setObjectRef] = useState<string | null>(null); // Format: "resource:id" or "booking:id"
 
-  // Queries - App Data (for display)
+  // Queries - App Data
   const users = useQuery(api.app.listUsers) ?? [];
   const resources = useQuery(api.app.listResources) ?? [];
   const bookings = useQuery(api.app.listBookings) ?? [];
+  const permissions = useQuery(api.app.listPermissions) ?? [];
 
-  // Queries - Resource Permissions
-  const resourcePermissions = useQuery(
-    api.app.getResourcePermissions,
-    selectedUserId && selectedResourceId
-      ? { userId: selectedUserId, resourceId: selectedResourceId }
+  // Parse objectRef to extract type and ID
+  const parsedObject = objectRef
+    ? (() => {
+        const [type, ...idParts] = objectRef.split(":");
+        const id = idParts.join(":"); // Handle IDs with colons
+        return { type, id };
+      })()
+    : null;
+
+  // Query - Permission Check with Path
+  const checkResult = useQuery(
+    api.app.canWithPath,
+    userId && action && parsedObject
+      ? {
+          userId,
+          action,
+          objectType: parsedObject.type,
+          objectId: parsedObject.id,
+        }
       : "skip"
   );
 
-  // Queries - Booking Permissions
+  // Query - All Permissions for Object
+  const allPermissions = useQuery(
+    api.app.getResourcePermissions,
+    userId && parsedObject && parsedObject.type === "resource"
+      ? {
+          userId,
+          resourceId: parsedObject.id as Id<"resources">,
+        }
+      : "skip"
+  );
+
   const bookingPermissions = useQuery(
     api.app.getBookingPermissions,
-    selectedUserId && selectedBookingId
-      ? { userId: selectedUserId, bookingId: selectedBookingId }
-      : "skip"
-  );
-
-  // Queries - Permission Checks (legacy)
-  const canManageResource = useQuery(
-    api.app.canUserManageResource,
-    selectedUserId && selectedResourceId
-      ? { userId: selectedUserId, resourceId: selectedResourceId }
-      : "skip"
-  );
-  const isOrgAdmin = useQuery(
-    api.app.isUserOrgAdmin,
-    selectedUserId && selectedOrgId
-      ? { userId: selectedUserId, orgId: selectedOrgId }
-      : "skip"
-  );
-  const isOrgMember = useQuery(
-    api.app.isUserOrgMember,
-    selectedUserId && selectedOrgId
-      ? { userId: selectedUserId, orgId: selectedOrgId }
+    userId && parsedObject && parsedObject.type === "booking"
+      ? {
+          userId,
+          bookingId: parsedObject.id as Id<"bookings">,
+        }
       : "skip"
   );
 
@@ -64,307 +81,257 @@ export function PermissionTesterPage() {
       <section>
         <div className="flex items-center gap-2 mb-4">
           <Shield className="size-5" />
-          <h2 className="text-xl font-semibold">Permission Checks</h2>
+          <h2 className="text-xl font-semibold">Permission Tester</h2>
           <span className="text-muted-foreground text-sm">
-            (Zanzibar-style recursive traversal)
+            (Interactive permission checker with graph visualization)
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Is Org Admin */}
-          <Card
-            className={`border-2 ${
-              isOrgAdmin === undefined
-                ? "border-border"
-                : isOrgAdmin
-                  ? "border-green-500"
-                  : "border-destructive"
-            }`}
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                {isOrgAdmin !== undefined &&
-                  (isOrgAdmin ? (
-                    <Check className="size-4 text-green-500" />
-                  ) : (
-                    <X className="size-4 text-destructive" />
-                  ))}
-                Is Org Admin?
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {selectedUserId && selectedOrgId ? (
-                <>
-                  <code className="text-xs text-muted-foreground block mb-2">
-                    check(org, admin_of, user)
-                  </code>
-                  <p
-                    className={`text-2xl font-bold ${isOrgAdmin ? "text-green-500" : "text-destructive"}`}
-                  >
-                    {isOrgAdmin === undefined
-                      ? "..."
-                      : isOrgAdmin
-                        ? "YES"
-                        : "NO"}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Select user & org
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Is Org Member */}
-          <Card
-            className={`border-2 ${
-              isOrgMember === undefined
-                ? "border-border"
-                : isOrgMember
-                  ? "border-green-500"
-                  : "border-destructive"
-            }`}
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                {isOrgMember !== undefined &&
-                  (isOrgMember ? (
-                    <Check className="size-4 text-green-500" />
-                  ) : (
-                    <X className="size-4 text-destructive" />
-                  ))}
-                Is Org Member?
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {selectedUserId && selectedOrgId ? (
-                <>
-                  <code className="text-xs text-muted-foreground block mb-2">
-                    admin_of OR member_of
-                  </code>
-                  <p
-                    className={`text-2xl font-bold ${isOrgMember ? "text-green-500" : "text-destructive"}`}
-                  >
-                    {isOrgMember === undefined
-                      ? "..."
-                      : isOrgMember
-                        ? "YES"
-                        : "NO"}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Select user & org
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Can Manage Resource */}
-          <Card
-            className={`border-2 ${
-              canManageResource === undefined
-                ? "border-border"
-                : canManageResource
-                  ? "border-green-500"
-                  : "border-destructive"
-            }`}
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                {canManageResource !== undefined &&
-                  (canManageResource ? (
-                    <Check className="size-4 text-green-500" />
-                  ) : (
-                    <X className="size-4 text-destructive" />
-                  ))}
-                Can Manage Resource?
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {selectedUserId && selectedResourceId ? (
-                <>
-                  <code className="text-xs text-muted-foreground block mb-2">
-                    user → org → resource
-                  </code>
-                  <p
-                    className={`text-2xl font-bold ${canManageResource ? "text-green-500" : "text-destructive"}`}
-                  >
-                    {canManageResource === undefined
-                      ? "..."
-                      : canManageResource
-                        ? "YES"
-                        : "NO"}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Select user & resource
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Resource Permissions Card - THE NEW MAGIC! */}
-        {selectedUserId && selectedResourceId && (
-          <Card className="mt-4 border-2 border-primary">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Shield className="size-4" />
-                Resource Permissions
-                {resourcePermissions?.relation && (
-                  <span className="text-xs font-normal bg-primary/20 px-2 py-0.5 rounded">
-                    via {resourcePermissions.relation}
-                  </span>
-                )}
-              </CardTitle>
-              <CardDescription>
-                What can{" "}
-                {users.find((u) => u._id === selectedUserId)?.name ?? "user"} do
-                with{" "}
-                {resources.find((r) => r._id === selectedResourceId)?.name ??
-                  "resource"}
-                ?
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-4 gap-4">
-                {(["create", "read", "update", "delete"] as const).map(
-                  (action) => {
-                    const allowed =
-                      resourcePermissions?.[
-                        action as keyof typeof resourcePermissions
-                      ];
-                    return (
-                      <div
-                        key={action}
-                        className={`flex flex-col items-center p-3 rounded-lg border-2 ${
-                          allowed
-                            ? "border-green-500 bg-green-500/10"
-                            : "border-destructive/50 bg-destructive/5"
-                        }`}
-                      >
-                        {allowed ? (
-                          <Check className="size-6 text-green-500 mb-1" />
-                        ) : (
-                          <X className="size-6 text-destructive mb-1" />
-                        )}
-                        <span className="text-sm font-medium capitalize">
-                          {action}
-                        </span>
-                      </div>
-                    );
-                  }
-                )}
+        {/* Input Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Test Permission</CardTitle>
+            <CardDescription>
+              Select a user, action, and object to check permissions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              {/* User Dropdown */}
+              <div>
+                <label className="text-xs font-medium mb-2 block">User</label>
+                <Select
+                  value={userId ?? undefined}
+                  onValueChange={(val) => setUserId(val as Id<"users">)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select user..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.length === 0 ? (
+                      <SelectItem value="none" disabled>
+                        No users available
+                      </SelectItem>
+                    ) : (
+                      users.map((u) => (
+                        <SelectItem key={u._id} value={u._id}>
+                          {u.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Action Dropdown */}
+              <div>
+                <label className="text-xs font-medium mb-2 block">Action</label>
+                <Select value={action ?? undefined} onValueChange={setAction}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select action..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {permissions.length === 0 ? (
+                      <SelectItem value="none" disabled>
+                        No permissions available
+                      </SelectItem>
+                    ) : (
+                      <>
+                        <SelectGroup>
+                          <SelectLabel>CRUD Operations</SelectLabel>
+                          {permissions
+                            .filter((p) => p.category === "crud")
+                            .map((p) => (
+                              <SelectItem key={p.name} value={p.name}>
+                                {p.label}
+                              </SelectItem>
+                            ))}
+                        </SelectGroup>
+                        <SelectGroup>
+                          <SelectLabel>Common Actions</SelectLabel>
+                          {permissions
+                            .filter((p) => p.category === "action")
+                            .map((p) => (
+                              <SelectItem key={p.name} value={p.name}>
+                                {p.label}
+                              </SelectItem>
+                            ))}
+                        </SelectGroup>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Object Dropdown */}
+              <div>
+                <label className="text-xs font-medium mb-2 block">Object</label>
+                <Select value={objectRef ?? undefined} onValueChange={setObjectRef}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select object..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {resources.length === 0 && bookings.length === 0 ? (
+                      <SelectItem value="none" disabled>
+                        No objects available
+                      </SelectItem>
+                    ) : (
+                      <>
+                        {resources.length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel>Resources</SelectLabel>
+                            {resources.map((r) => (
+                              <SelectItem
+                                key={r._id}
+                                value={`resource:${r._id}`}
+                              >
+                                {r.name}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                        {bookings.length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel>Bookings</SelectLabel>
+                            {bookings.map((b) => (
+                              <SelectItem
+                                key={b._id}
+                                value={`booking:${b._id}`}
+                              >
+                                {b.title}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Result Display */}
+        {checkResult && (
+          <Card
+            className={cn(
+              "border-2",
+              checkResult.allowed ? "border-green-500" : "border-destructive"
+            )}
+          >
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 mb-4">
+                {checkResult.allowed ? (
+                  <CheckCircle2 className="size-8 text-green-500" />
+                ) : (
+                  <XCircle className="size-8 text-destructive" />
+                )}
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    {checkResult.allowed ? "ALLOWED" : "DENIED"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {checkResult.reason}
+                  </p>
+                </div>
+              </div>
+              {checkResult.matchedRule && (
+                <p className="text-sm">
+                  <span className="font-medium">Matched rule:</span>{" "}
+                  <code className="bg-secondary px-2 py-1 rounded text-xs">
+                    {checkResult.matchedRule}
+                  </code>
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
 
-        {/* Booking Permissions Card */}
-        {selectedUserId && selectedBookingId && (
-          <Card className="mt-4 border-2 border-yellow-500">
+        {/* Traversal Graph */}
+        {checkResult && (
+          <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Calendar className="size-4" />
-                Booking Permissions
-                {bookingPermissions?.relation && (
-                  <span className="text-xs font-normal bg-yellow-500/20 px-2 py-0.5 rounded">
-                    via {bookingPermissions.relation}
-                  </span>
-                )}
-              </CardTitle>
+              <CardTitle className="text-base">Permission Check Path</CardTitle>
               <CardDescription>
-                What can{" "}
-                {users.find((u) => u._id === selectedUserId)?.name ?? "user"} do
-                with{" "}
-                {bookings.find((b) => b._id === selectedBookingId)?.title ??
-                  "booking"}
-                ?
+                Visualizes how the permission check traversed the object graph
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-5 gap-4">
-                {(["create", "read", "update", "delete", "cancel"] as const).map(
-                  (action) => {
-                    const allowed =
-                      bookingPermissions?.[
-                        action as keyof typeof bookingPermissions
-                      ];
-                    return (
-                      <div
-                        key={action}
-                        className={`flex flex-col items-center p-3 rounded-lg border-2 ${
-                          allowed
-                            ? "border-green-500 bg-green-500/10"
-                            : "border-destructive/50 bg-destructive/5"
-                        }`}
-                      >
-                        {allowed ? (
-                          <Check className="size-6 text-green-500 mb-1" />
-                        ) : (
-                          <X className="size-6 text-destructive mb-1" />
-                        )}
-                        <span className="text-sm font-medium capitalize">
-                          {action}
-                        </span>
-                      </div>
-                    );
-                  }
-                )}
-              </div>
+              <TraversalGraph data={checkResult} />
             </CardContent>
           </Card>
         )}
 
-        {/* Traversal Explanation */}
-        {selectedUserId && selectedResourceId && (
-          <Card className="mt-4">
+        {/* All Permissions Panel */}
+        {userId && parsedObject && (allPermissions || bookingPermissions) && (
+          <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                Recursive Traversal Path
+                All Permissions on This Object
               </CardTitle>
+              <CardDescription>
+                Shows all permissions{" "}
+                {users.find((u) => u._id === userId)?.name ?? "user"} has on
+                this{" "}
+                {parsedObject.type === "resource"
+                  ? resources.find((r) => r._id === parsedObject.id)?.name
+                  : bookings.find((b) => b._id === parsedObject.id)?.title}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 text-sm font-mono flex-wrap">
-                <span className="px-2 py-1 bg-green-500/20 rounded">
-                  user:{users.find((u) => u._id === selectedUserId)?.name}
-                </span>
-                <ArrowRight className="size-4" />
-                <span className="text-muted-foreground">
-                  admin_of/member_of?
-                </span>
-                <ArrowRight className="size-4" />
-                <span className="px-2 py-1 bg-yellow-500/20 rounded">
-                  org:?
-                </span>
-                <ArrowRight className="size-4" />
-                <span className="text-muted-foreground">owner?</span>
-                <ArrowRight className="size-4" />
-                <span className="px-2 py-1 bg-blue-500/20 rounded">
-                  resource:
-                  {resources.find((r) => r._id === selectedResourceId)?.name}
-                </span>
-                {selectedBookingId && (
-                  <>
-                    <ArrowRight className="size-4" />
-                    <span className="text-muted-foreground">parent?</span>
-                    <ArrowRight className="size-4" />
-                    <span className="px-2 py-1 bg-purple-500/20 rounded">
-                      booking:
-                      {bookings.find((b) => b._id === selectedBookingId)?.title}
-                    </span>
-                  </>
-                )}
+              <div className="flex flex-wrap gap-2">
+                {parsedObject.type === "resource" &&
+                  allPermissions &&
+                  (["create", "read", "update", "delete"] as const).map(
+                    (perm) => {
+                      const allowed = allPermissions[perm];
+                      return (
+                        <div
+                          key={perm}
+                          className={cn(
+                            "px-3 py-1.5 rounded-md text-sm font-medium border",
+                            allowed
+                              ? "bg-green-500/10 border-green-500 text-green-700 dark:text-green-400"
+                              : "bg-muted border-border text-muted-foreground"
+                          )}
+                        >
+                          {perm}
+                        </div>
+                      );
+                    }
+                  )}
+                {parsedObject.type === "booking" &&
+                  bookingPermissions &&
+                  (["create", "read", "update", "delete", "cancel"] as const).map(
+                    (perm) => {
+                      const allowed = bookingPermissions[perm];
+                      return (
+                        <div
+                          key={perm}
+                          className={cn(
+                            "px-3 py-1.5 rounded-md text-sm font-medium border",
+                            allowed
+                              ? "bg-green-500/10 border-green-500 text-green-700 dark:text-green-400"
+                              : "bg-muted border-border text-muted-foreground"
+                          )}
+                        >
+                          {perm}
+                        </div>
+                      );
+                    }
+                  )}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Rules like{" "}
-                <code className="bg-muted px-1 rounded">
-                  booking.cancel = "parent-&gt;edit | booker"
-                </code>{" "}
-                enable multi-hop traversal
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Empty State */}
+        {!userId && !action && !objectRef && (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground text-center">
+                Select a user, action, and object to test permissions
               </p>
             </CardContent>
           </Card>
