@@ -116,18 +116,344 @@ export const seedPermissionRules = mutation({
 });
 
 /**
+ * Seed comprehensive demo data
+ *
+ * Creates a complete demo dataset with 2 orgs, 4 users, 4 resources, and 8 bookings.
+ * All Zanvex tuples are automatically created via dual-write mutations.
+ *
+ * This is idempotent - safe to run multiple times.
+ */
+export const seedDemoData = mutation({
+  args: {},
+  returns: v.object({
+    users: v.object({
+      acme: v.array(v.id("users")),
+      betaco: v.array(v.id("users"))
+    }),
+    orgs: v.object({
+      acme: v.id("orgs"),
+      betaco: v.id("orgs")
+    }),
+    resources: v.object({
+      acme: v.array(v.id("resources")),
+      betaco: v.array(v.id("resources"))
+    }),
+    bookings: v.object({
+      acme: v.array(v.id("bookings")),
+      betaco: v.array(v.id("bookings"))
+    }),
+    tuples: v.number(),
+  }),
+  handler: async (ctx) => {
+    console.log("🎭 Starting demo data seed...\n");
+
+    // Helper: Get or create user (idempotent)
+    const getOrCreateUser = async (name: string, email: string) => {
+      const existing = (await ctx.db.query("users").collect()).find(u => u.email === email);
+      if (existing) return existing._id;
+      return await ctx.runMutation(api.app.createUser, { name, email });
+    };
+
+    // Helper: Get or create org (idempotent)
+    const getOrCreateOrg = async (name: string, slug: string) => {
+      const existing = (await ctx.db.query("orgs").collect()).find(o => o.slug === slug);
+      if (existing) return existing._id;
+      return await ctx.runMutation(api.app.createOrg, { name, slug });
+    };
+
+    // Helper: Add user to org if not exists (idempotent)
+    const addUserToOrgIfNotExists = async (
+      userId: any,
+      orgId: any,
+      role: "admin" | "member"
+    ) => {
+      const existing = await ctx.db
+        .query("org_members")
+        .withIndex("by_org_user", (q: any) => q.eq("orgId", orgId).eq("userId", userId))
+        .first();
+      if (!existing) {
+        await ctx.runMutation(api.app.addUserToOrg, { userId, orgId, role });
+      }
+    };
+
+    // Helper: Get or create resource (idempotent)
+    const getOrCreateResource = async (name: string, orgId: any) => {
+      const existing = await ctx.db
+        .query("resources")
+        .withIndex("by_org", (q: any) => q.eq("orgId", orgId))
+        .collect();
+      const found = existing.find((r: any) => r.name === name);
+      if (found) return found._id;
+      return await ctx.runMutation(api.app.createResource, { name, orgId });
+    };
+
+    // Helper: Get or create booking (idempotent)
+    const getOrCreateBooking = async (
+      title: string,
+      resourceId: any,
+      bookerId: any,
+      start: string
+    ) => {
+      const existing = await ctx.db
+        .query("bookings")
+        .withIndex("by_resource", (q: any) => q.eq("resourceId", resourceId))
+        .collect();
+      const found = existing.find((b: any) => b.title === title && b.bookerId === bookerId);
+      if (found) return found._id;
+      return await ctx.runMutation(api.app.createBooking, { title, resourceId, bookerId, start });
+    };
+
+    // Helper: Calculate relative dates
+    const addDays = (days: number, hour: number = 0, minute: number = 0): string => {
+      const result = new Date();
+      result.setDate(result.getDate() + days);
+      result.setUTCHours(hour, minute, 0, 0);
+      return result.toISOString();
+    };
+
+    // 1. Create Organizations
+    console.log("🏢 Creating organizations...");
+    const acmeId = await getOrCreateOrg("Acme Studio", "acme");
+    const betacoId = await getOrCreateOrg("BetaCo Studio", "betaco");
+    console.log("   ✓ Acme Studio (acme)");
+    console.log("   ✓ BetaCo Studio (betaco)");
+
+    // 2. Create Users
+    console.log("\n👥 Creating users...");
+    const aliceId = await getOrCreateUser("Alice", "alice@acme.com");
+    const bobId = await getOrCreateUser("Bob", "bob@acme.com");
+    const charlieId = await getOrCreateUser("Charlie", "charlie@betaco.com");
+    const dianaId = await getOrCreateUser("Diana", "diana@betaco.com");
+    console.log("   ✓ Acme: Alice (alice@acme.com), Bob (bob@acme.com)");
+    console.log("   ✓ BetaCo: Charlie (charlie@betaco.com), Diana (diana@betaco.com)");
+
+    // 3. Add Users to Orgs
+    console.log("\n🔗 Adding users to organizations...");
+    await addUserToOrgIfNotExists(aliceId, acmeId, "admin");
+    await addUserToOrgIfNotExists(bobId, acmeId, "member");
+    await addUserToOrgIfNotExists(charlieId, betacoId, "admin");
+    await addUserToOrgIfNotExists(dianaId, betacoId, "member");
+    console.log("   ✓ Alice → Acme (admin)");
+    console.log("   ✓ Bob → Acme (member)");
+    console.log("   ✓ Charlie → BetaCo (admin)");
+    console.log("   ✓ Diana → BetaCo (member)");
+
+    // 4. Create Resources
+    console.log("\n📦 Creating resources...");
+    const studioAId = await getOrCreateResource("Studio A", acmeId);
+    const studioBId = await getOrCreateResource("Studio B", acmeId);
+    const studioXId = await getOrCreateResource("Studio X", betacoId);
+    const studioYId = await getOrCreateResource("Studio Y", betacoId);
+    console.log("   ✓ Acme: Studio A, Studio B");
+    console.log("   ✓ BetaCo: Studio X, Studio Y");
+
+    // 5. Create Bookings
+    console.log("\n📅 Creating bookings...");
+    const acmeBookings = [
+      await getOrCreateBooking("Morning Session", studioAId, aliceId, addDays(2, 9, 0)),
+      await getOrCreateBooking("Afternoon Session", studioAId, bobId, addDays(3, 14, 0)),
+      await getOrCreateBooking("Evening Session", studioBId, aliceId, addDays(5, 18, 0)),
+      await getOrCreateBooking("Night Session", studioBId, bobId, addDays(7, 20, 0)),
+    ];
+    const betacoBookings = [
+      await getOrCreateBooking("Weekend Session", studioXId, charlieId, addDays(10, 11, 0)),
+      await getOrCreateBooking("Weekday Session", studioXId, dianaId, addDays(12, 15, 0)),
+      await getOrCreateBooking("Premium Session", studioYId, charlieId, addDays(15, 10, 0)),
+      await getOrCreateBooking("Standard Session", studioYId, dianaId, addDays(18, 13, 0)),
+    ];
+    console.log("   ✓ Acme: 4 bookings (Studio A: 2, Studio B: 2)");
+    console.log("   ✓ BetaCo: 4 bookings (Studio X: 2, Studio Y: 2)");
+
+    // 6. Update booking statuses (first 6 confirmed, last 2 pending)
+    console.log("\n✏️  Updating booking statuses...");
+    const allBookings = [...acmeBookings, ...betacoBookings];
+    for (let i = 0; i < 6; i++) {
+      await ctx.db.patch(allBookings[i], { status: "confirmed" });
+    }
+    console.log("   ✓ 6 bookings confirmed, 2 pending");
+
+    // 7. Calculate total tuples created
+    // 4 org memberships + 4 resource ownerships + 16 booking relations (8 × 2: parent + booker)
+    const totalTuples = 4 + 4 + 16;
+
+    console.log("\n✅ Demo data seed complete!");
+    console.log(`   - Users: 4 (2 per org)`);
+    console.log(`   - Organizations: 2`);
+    console.log(`   - Resources: 4 (2 per org)`);
+    console.log(`   - Bookings: 8 (6 confirmed, 2 pending)`);
+    console.log(`   - Zanvex tuples: ${totalTuples} (auto-created via dual-write)\n`);
+
+    return {
+      users: {
+        acme: [aliceId, bobId],
+        betaco: [charlieId, dianaId]
+      },
+      orgs: {
+        acme: acmeId,
+        betaco: betacoId
+      },
+      resources: {
+        acme: [studioAId, studioBId],
+        betaco: [studioXId, studioYId]
+      },
+      bookings: {
+        acme: acmeBookings,
+        betaco: betacoBookings
+      },
+      tuples: totalTuples
+    };
+  },
+});
+
+/**
+ * Clear demo data
+ *
+ * Removes all demo users, orgs, resources, and bookings.
+ * Zanvex tuples are automatically deleted via app deletion functions.
+ *
+ * This preserves catalogs (permissions, relations, object types, rules).
+ */
+export const clearDemoData = mutation({
+  args: {},
+  returns: v.object({
+    bookings: v.number(),
+    resources: v.number(),
+    memberships: v.number(),
+    users: v.number(),
+    orgs: v.number(),
+    tuples: v.number(),
+  }),
+  handler: async (ctx) => {
+    console.log("🧹 Clearing demo data...\n");
+
+    // Demo identifiers
+    const DEMO_USER_EMAILS = [
+      "alice@acme.com",
+      "bob@acme.com",
+      "charlie@betaco.com",
+      "diana@betaco.com",
+    ];
+    const DEMO_ORG_SLUGS = ["acme", "betaco"];
+    const DEMO_RESOURCE_NAMES = ["Studio A", "Studio B", "Studio X", "Studio Y"];
+    const DEMO_BOOKING_TITLES = [
+      "Morning Session",
+      "Afternoon Session",
+      "Evening Session",
+      "Night Session",
+      "Weekend Session",
+      "Weekday Session",
+      "Premium Session",
+      "Standard Session",
+    ];
+
+    // 1. Delete Bookings (leaf nodes)
+    console.log("📅 Deleting bookings...");
+    const allBookings = await ctx.db.query("bookings").collect();
+    const demoBookings = allBookings.filter((b) => DEMO_BOOKING_TITLES.includes(b.title));
+    for (const b of demoBookings) {
+      await ctx.runMutation(api.app.deleteBooking, { bookingId: b._id });
+    }
+    console.log(`   ✓ Deleted ${demoBookings.length} bookings`);
+
+    // 2. Delete Resources
+    console.log("📦 Deleting resources...");
+    const allResources = await ctx.db.query("resources").collect();
+    const demoResources = allResources.filter((r) => DEMO_RESOURCE_NAMES.includes(r.name));
+    for (const r of demoResources) {
+      await ctx.runMutation(api.app.deleteResource, { resourceId: r._id });
+    }
+    console.log(`   ✓ Deleted ${demoResources.length} resources`);
+
+    // 3. Delete Org Memberships + Users (users auto-delete memberships)
+    console.log("👥 Deleting users...");
+    const allUsers = await ctx.db.query("users").collect();
+    const demoUsers = allUsers.filter((u) => DEMO_USER_EMAILS.includes(u.email));
+
+    // Count memberships before deletion
+    let membershipCount = 0;
+    for (const user of demoUsers) {
+      const memberships = await ctx.db
+        .query("org_members")
+        .withIndex("by_user", (q: any) => q.eq("userId", user._id))
+        .collect();
+      membershipCount += memberships.length;
+    }
+
+    for (const u of demoUsers) {
+      await ctx.runMutation(api.app.deleteUser, { userId: u._id });
+    }
+    console.log(`   ✓ Deleted ${demoUsers.length} users`);
+    console.log(`   ✓ Deleted ${membershipCount} org memberships (auto-cleanup)`);
+
+    // 4. Delete Organizations
+    console.log("🏢 Deleting organizations...");
+    const allOrgs = await ctx.db.query("orgs").collect();
+    const demoOrgs = allOrgs.filter((o) => DEMO_ORG_SLUGS.includes(o.slug));
+    for (const o of demoOrgs) {
+      await ctx.runMutation(api.app.deleteOrg, { orgId: o._id });
+    }
+    console.log(`   ✓ Deleted ${demoOrgs.length} organizations`);
+
+    // 5. Calculate total tuples deleted
+    // 4 org memberships + 4 resource ownerships + 16 booking relations
+    const totalTuples = membershipCount + demoResources.length + (demoBookings.length * 2);
+
+    console.log("\n✅ Demo data cleared!");
+    console.log(`   - Bookings: ${demoBookings.length}`);
+    console.log(`   - Resources: ${demoResources.length}`);
+    console.log(`   - Org memberships: ${membershipCount}`);
+    console.log(`   - Users: ${demoUsers.length}`);
+    console.log(`   - Organizations: ${demoOrgs.length}`);
+    console.log(`   - Zanvex tuples: ${totalTuples} (auto-deleted)\n`);
+
+    return {
+      bookings: demoBookings.length,
+      resources: demoResources.length,
+      memberships: membershipCount,
+      users: demoUsers.length,
+      orgs: demoOrgs.length,
+      tuples: totalTuples,
+    };
+  },
+});
+
+/**
  * Seed everything at once
+ *
+ * Optionally includes demo data (2 orgs, 4 users, 4 resources, 8 bookings).
+ *
+ * Usage:
+ *   npx convex run seed:seedAll                                  # Catalogs only
+ *   npx convex run seed:seedAll '{"includeDemoData": true}'       # Catalogs + demo data
  */
 export const seedAll = mutation({
-  args: {},
+  args: {
+    includeDemoData: v.optional(v.boolean()),
+  },
   returns: v.object({
     permissions: v.object({ total: v.number() }),
     relations: v.object({ total: v.number() }),
+    demoData: v.optional(v.object({
+      users: v.object({
+        acme: v.array(v.id("users")),
+        betaco: v.array(v.id("users"))
+      }),
+      orgs: v.object({
+        acme: v.id("orgs"),
+        betaco: v.id("orgs")
+      }),
+      resources: v.object({
+        acme: v.array(v.id("resources")),
+        betaco: v.array(v.id("resources"))
+      }),
+      bookings: v.object({
+        acme: v.array(v.id("bookings")),
+        betaco: v.array(v.id("bookings"))
+      }),
+      tuples: v.number(),
+    })),
   }),
-  handler: async (ctx): Promise<{
-    permissions: { total: number };
-    relations: { total: number };
-  }> => {
+  handler: async (ctx, args) => {
     console.log("🌱 Starting Zanvex database seed...\n");
 
     // Step 1: Seed catalogs
@@ -143,15 +469,22 @@ export const seedAll = mutation({
     console.log("\n🔐 Seeding permission rules...");
     await ctx.runMutation(api.seed.seedPermissionRules, {});
 
-    console.log("\n✅ Database seeding complete!");
+    console.log("\n✅ Catalog seeding complete!");
     console.log(`   - Permissions: ${permResult.total}`);
     console.log(`   - Relations: ${relResult.total}`);
     console.log(`   - Object types: 4 (user, org, resource, booking)`);
     console.log(`   - Permission rules: 6\n`);
 
+    // Step 4: Optional demo data
+    let demoResult;
+    if (args.includeDemoData) {
+      demoResult = await ctx.runMutation(api.seed.seedDemoData, {});
+    }
+
     return {
       permissions: permResult,
       relations: relResult,
+      demoData: demoResult,
     };
   },
 });
