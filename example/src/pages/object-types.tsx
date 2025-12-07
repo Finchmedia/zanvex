@@ -11,6 +11,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Database, Plus, Trash2, RefreshCw, Edit2, Save, X } from "lucide-react";
 
 interface Relation {
@@ -27,6 +34,7 @@ interface ObjectType {
 
 export function ObjectTypesPage() {
   const objectTypes = useQuery(api.app.listObjectTypes) ?? [];
+  const relationNames = useQuery(api.app.listRelationNames) ?? [];
   const registerObjectType = useMutation(api.app.registerObjectType);
   const deleteObjectType = useMutation(api.app.deleteObjectType);
   const initializeObjectTypes = useMutation(api.app.initializeObjectTypes);
@@ -252,18 +260,37 @@ export function ObjectTypesPage() {
                 <div className="border-t pt-3 space-y-2">
                   <p className="text-xs text-muted-foreground">Add Relation:</p>
                   <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      placeholder="Relation name"
-                      value={relationName}
-                      onChange={(e) => setRelationName(e.target.value)}
-                      className="text-sm"
-                    />
-                    <Input
-                      placeholder="Target type"
-                      value={relationTarget}
-                      onChange={(e) => setRelationTarget(e.target.value)}
-                      className="text-sm"
-                    />
+                    <Select value={relationName} onValueChange={setRelationName}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select relation..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {relationNames.map((rel) => (
+                          <SelectItem key={rel.name} value={rel.name}>
+                            <div className="flex flex-col items-start">
+                              <span>{rel.label}</span>
+                              {rel.description && (
+                                <span className="text-xs text-muted-foreground">
+                                  {rel.description}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={relationTarget} onValueChange={setRelationTarget}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select target type..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {objectTypes.map((type) => (
+                          <SelectItem key={type.name} value={type.name}>
+                            {type.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <Input
                     placeholder="Description (optional)"

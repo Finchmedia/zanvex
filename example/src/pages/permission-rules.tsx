@@ -11,12 +11,23 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { RuleBuilder } from "@/components/rule-builder";
 import { Settings, RefreshCw, Trash2, Plus, Save, X } from "lucide-react";
 
 export function PermissionRulesPage() {
   // Queries
   const permissionRules = useQuery(api.app.listPermissionRules) ?? [];
   const objectTypes = useQuery(api.app.listObjectTypes) ?? [];
+  const permissions = useQuery(api.app.listPermissions) ?? [];
 
   // Mutations
   const initializePermissionRules = useMutation(
@@ -145,57 +156,62 @@ export function PermissionRulesPage() {
               {/* Object Type Selection */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Object Type</label>
-                {objectTypes.length > 0 ? (
-                  <select
-                    className="w-full px-3 py-2 rounded-md bg-secondary border border-input text-sm"
-                    value={objectType}
-                    onChange={(e) => setObjectType(e.target.value)}
-                  >
-                    <option value="">Select object type...</option>
+                <Select value={objectType} onValueChange={setObjectType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select object type..." />
+                  </SelectTrigger>
+                  <SelectContent>
                     {objectTypes.map((type) => (
-                      <option key={type.name} value={type.name}>
+                      <SelectItem key={type.name} value={type.name}>
                         {type.name}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                ) : (
-                  <Input
-                    placeholder="e.g., resource, booking"
-                    value={objectType}
-                    onChange={(e) => setObjectType(e.target.value)}
-                  />
-                )}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Permission Name */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Permission</label>
-                <Input
-                  placeholder="e.g., view, edit, delete, cancel"
-                  value={permission}
-                  onChange={(e) => setPermission(e.target.value)}
-                />
+                <Select value={permission} onValueChange={setPermission}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select permission..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>CRUD Operations</SelectLabel>
+                      {permissions
+                        .filter((p) => p.category === "crud")
+                        .map((perm) => (
+                          <SelectItem key={perm.name} value={perm.name}>
+                            {perm.label}
+                          </SelectItem>
+                        ))}
+                    </SelectGroup>
+                    <SelectGroup>
+                      <SelectLabel>Common Actions</SelectLabel>
+                      {permissions
+                        .filter((p) => p.category === "action")
+                        .map((perm) => (
+                          <SelectItem key={perm.name} value={perm.name}>
+                            {perm.label}
+                          </SelectItem>
+                        ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* DSL Expression */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">DSL Expression</label>
-                <Input
-                  placeholder="e.g., owner->admin_of | booker"
-                  value={expression}
-                  onChange={(e) => setExpression(e.target.value)}
-                  className="font-mono"
-                />
-              </div>
-
-              {/* Preview */}
-              {objectType && permission && expression && (
-                <div className="p-3 bg-secondary rounded-lg font-mono text-sm">
-                  <span className="text-blue-500">{objectType}</span>
-                  <span className="text-muted-foreground">.</span>
-                  <span className="text-yellow-500">{permission}</span>
-                  <span className="text-muted-foreground"> = </span>
-                  <span className="text-green-500">{expression}</span>
+              {/* Visual Rule Builder */}
+              {objectType && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Permission Rule</label>
+                  <RuleBuilder
+                    objectType={objectType}
+                    objectTypes={objectTypes}
+                    permissions={permissions}
+                    onRuleChange={setExpression}
+                  />
                 </div>
               )}
 
@@ -212,41 +228,43 @@ export function PermissionRulesPage() {
           </Card>
         </div>
 
-        {/* DSL Syntax Reference */}
+        {/* Permission Rule Concepts */}
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle className="text-base">DSL Syntax Reference</CardTitle>
+            <CardTitle className="text-base">Permission Rule Concepts</CardTitle>
             <CardDescription>
-              How to write permission expressions
+              Understanding how permission rules work
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 text-sm">
-              <div>
-                <div className="font-mono text-green-500 mb-1">booker</div>
+              <div className="flex items-start gap-2">
+                <div className="font-mono bg-secondary px-2 py-1 rounded shrink-0">
+                  booker
+                </div>
                 <p className="text-muted-foreground">
-                  <strong>Direct relation check:</strong> Subject must have the
+                  <strong>Direct relation:</strong> Subject must have the
                   "booker" relation to the object
                 </p>
               </div>
 
-              <div>
-                <div className="font-mono text-green-500 mb-1">
-                  owner-&gt;admin_of
+              <div className="flex items-start gap-2">
+                <div className="font-mono bg-secondary px-2 py-1 rounded shrink-0">
+                  parent-&gt;edit
                 </div>
                 <p className="text-muted-foreground">
-                  <strong>Computed permission:</strong> Follow the "owner"
-                  relation, then check if subject has "admin_of" on that target
+                  <strong>Inherited permission:</strong> Follow "parent"
+                  relation, check if subject has "edit" on that target
                 </p>
               </div>
 
-              <div>
-                <div className="font-mono text-green-500 mb-1">
-                  parent-&gt;edit | booker
+              <div className="flex items-start gap-2">
+                <div className="font-mono bg-secondary px-2 py-1 rounded shrink-0">
+                  A | B
                 </div>
                 <p className="text-muted-foreground">
-                  <strong>OR logic:</strong> Either path grants access - subject
-                  can have edit permission on parent, OR be the booker
+                  <strong>OR logic:</strong> Subject can satisfy either
+                  condition A or condition B
                 </p>
               </div>
 
