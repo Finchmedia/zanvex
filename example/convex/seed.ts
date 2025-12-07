@@ -18,7 +18,8 @@ import { mutation } from "./_generated/server.js";
 import { api } from "./_generated/api.js";
 import { createZanvexClient } from "@mrfinch/zanvex";
 import { components } from "./_generated/api.js";
-import { v, type Id } from "convex/values";
+import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel.js";
 
 const zanvex = createZanvexClient(components.zanvex);
 
