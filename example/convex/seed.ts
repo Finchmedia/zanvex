@@ -18,7 +18,7 @@ import { mutation } from "./_generated/server.js";
 import { api } from "./_generated/api.js";
 import { createZanvexClient } from "@mrfinch/zanvex";
 import { components } from "./_generated/api.js";
-import { v } from "convex/values";
+import { v, type Id } from "convex/values";
 
 const zanvex = createZanvexClient(components.zanvex);
 
@@ -144,18 +144,24 @@ export const seedDemoData = mutation({
     }),
     tuples: v.number(),
   }),
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{
+    users: { acme: Id<"users">[]; betaco: Id<"users">[] };
+    orgs: { acme: Id<"orgs">; betaco: Id<"orgs"> };
+    resources: { acme: Id<"resources">[]; betaco: Id<"resources">[] };
+    bookings: { acme: Id<"bookings">[]; betaco: Id<"bookings">[] };
+    tuples: number;
+  }> => {
     console.log("🎭 Starting demo data seed...\n");
 
     // Helper: Get or create user (idempotent)
-    const getOrCreateUser = async (name: string, email: string) => {
+    const getOrCreateUser = async (name: string, email: string): Promise<Id<"users">> => {
       const existing = (await ctx.db.query("users").collect()).find(u => u.email === email);
       if (existing) return existing._id;
       return await ctx.runMutation(api.app.createUser, { name, email });
     };
 
     // Helper: Get or create org (idempotent)
-    const getOrCreateOrg = async (name: string, slug: string) => {
+    const getOrCreateOrg = async (name: string, slug: string): Promise<Id<"orgs">> => {
       const existing = (await ctx.db.query("orgs").collect()).find(o => o.slug === slug);
       if (existing) return existing._id;
       return await ctx.runMutation(api.app.createOrg, { name, slug });
@@ -163,10 +169,10 @@ export const seedDemoData = mutation({
 
     // Helper: Add user to org if not exists (idempotent)
     const addUserToOrgIfNotExists = async (
-      userId: any,
-      orgId: any,
+      userId: Id<"users">,
+      orgId: Id<"orgs">,
       role: "admin" | "member"
-    ) => {
+    ): Promise<void> => {
       const existing = await ctx.db
         .query("org_members")
         .withIndex("by_org_user", (q: any) => q.eq("orgId", orgId).eq("userId", userId))
@@ -177,7 +183,7 @@ export const seedDemoData = mutation({
     };
 
     // Helper: Get or create resource (idempotent)
-    const getOrCreateResource = async (name: string, orgId: any) => {
+    const getOrCreateResource = async (name: string, orgId: Id<"orgs">): Promise<Id<"resources">> => {
       const existing = await ctx.db
         .query("resources")
         .withIndex("by_org", (q: any) => q.eq("orgId", orgId))
@@ -190,10 +196,10 @@ export const seedDemoData = mutation({
     // Helper: Get or create booking (idempotent)
     const getOrCreateBooking = async (
       title: string,
-      resourceId: any,
-      bookerId: any,
+      resourceId: Id<"resources">,
+      bookerId: Id<"users">,
       start: string
-    ) => {
+    ): Promise<Id<"bookings">> => {
       const existing = await ctx.db
         .query("bookings")
         .withIndex("by_resource", (q: any) => q.eq("resourceId", resourceId))
@@ -213,17 +219,17 @@ export const seedDemoData = mutation({
 
     // 1. Create Organizations
     console.log("🏢 Creating organizations...");
-    const acmeId = await getOrCreateOrg("Acme Studio", "acme");
-    const betacoId = await getOrCreateOrg("BetaCo Studio", "betaco");
+    const acmeId: Id<"orgs"> = await getOrCreateOrg("Acme Studio", "acme");
+    const betacoId: Id<"orgs"> = await getOrCreateOrg("BetaCo Studio", "betaco");
     console.log("   ✓ Acme Studio (acme)");
     console.log("   ✓ BetaCo Studio (betaco)");
 
     // 2. Create Users
     console.log("\n👥 Creating users...");
-    const aliceId = await getOrCreateUser("Alice", "alice@acme.com");
-    const bobId = await getOrCreateUser("Bob", "bob@acme.com");
-    const charlieId = await getOrCreateUser("Charlie", "charlie@betaco.com");
-    const dianaId = await getOrCreateUser("Diana", "diana@betaco.com");
+    const aliceId: Id<"users"> = await getOrCreateUser("Alice", "alice@acme.com");
+    const bobId: Id<"users"> = await getOrCreateUser("Bob", "bob@acme.com");
+    const charlieId: Id<"users"> = await getOrCreateUser("Charlie", "charlie@betaco.com");
+    const dianaId: Id<"users"> = await getOrCreateUser("Diana", "diana@betaco.com");
     console.log("   ✓ Acme: Alice (alice@acme.com), Bob (bob@acme.com)");
     console.log("   ✓ BetaCo: Charlie (charlie@betaco.com), Diana (diana@betaco.com)");
 
@@ -240,22 +246,22 @@ export const seedDemoData = mutation({
 
     // 4. Create Resources
     console.log("\n📦 Creating resources...");
-    const studioAId = await getOrCreateResource("Studio A", acmeId);
-    const studioBId = await getOrCreateResource("Studio B", acmeId);
-    const studioXId = await getOrCreateResource("Studio X", betacoId);
-    const studioYId = await getOrCreateResource("Studio Y", betacoId);
+    const studioAId: Id<"resources"> = await getOrCreateResource("Studio A", acmeId);
+    const studioBId: Id<"resources"> = await getOrCreateResource("Studio B", acmeId);
+    const studioXId: Id<"resources"> = await getOrCreateResource("Studio X", betacoId);
+    const studioYId: Id<"resources"> = await getOrCreateResource("Studio Y", betacoId);
     console.log("   ✓ Acme: Studio A, Studio B");
     console.log("   ✓ BetaCo: Studio X, Studio Y");
 
     // 5. Create Bookings
     console.log("\n📅 Creating bookings...");
-    const acmeBookings = [
+    const acmeBookings: Id<"bookings">[] = [
       await getOrCreateBooking("Morning Session", studioAId, aliceId, addDays(2, 9, 0)),
       await getOrCreateBooking("Afternoon Session", studioAId, bobId, addDays(3, 14, 0)),
       await getOrCreateBooking("Evening Session", studioBId, aliceId, addDays(5, 18, 0)),
       await getOrCreateBooking("Night Session", studioBId, bobId, addDays(7, 20, 0)),
     ];
-    const betacoBookings = [
+    const betacoBookings: Id<"bookings">[] = [
       await getOrCreateBooking("Weekend Session", studioXId, charlieId, addDays(10, 11, 0)),
       await getOrCreateBooking("Weekday Session", studioXId, dianaId, addDays(12, 15, 0)),
       await getOrCreateBooking("Premium Session", studioYId, charlieId, addDays(15, 10, 0)),
@@ -453,7 +459,17 @@ export const seedAll = mutation({
       tuples: v.number(),
     })),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{
+    permissions: { total: number };
+    relations: { total: number };
+    demoData?: {
+      users: { acme: Id<"users">[]; betaco: Id<"users">[] };
+      orgs: { acme: Id<"orgs">; betaco: Id<"orgs"> };
+      resources: { acme: Id<"resources">[]; betaco: Id<"resources">[] };
+      bookings: { acme: Id<"bookings">[]; betaco: Id<"bookings">[] };
+      tuples: number;
+    };
+  }> => {
     console.log("🌱 Starting Zanvex database seed...\n");
 
     // Step 1: Seed catalogs
