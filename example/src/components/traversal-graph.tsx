@@ -86,16 +86,17 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
               <div className="text-xs text-muted-foreground truncate max-w-[140px] mt-1">
                 {node.displayName || node.nodeId}
               </div>
-              {isStart && (
-                <div className="text-xs text-blue-500 font-medium mt-1">subject</div>
-              )}
-              {isEnd && (
-                <div className="text-xs text-purple-500 font-medium mt-1">target</div>
-              )}
+              <div className="text-xs font-medium mt-1" style={{ minHeight: "16px" }}>
+                {isStart && <span className="text-blue-500">subject</span>}
+                {isEnd && <span className="text-purple-500">target</span>}
+                {!isStart && !isEnd && (
+                  <span className="text-muted-foreground">hop {i}</span>
+                )}
+              </div>
             </div>
           ),
         },
-        position: { x: i * 250, y: 100 },
+        position: { x: i * 280, y: 50 },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
         style: {
@@ -124,6 +125,15 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
           },
           style: data.allowed ? undefined : {
             strokeDasharray: "5,5",
+          },
+          labelStyle: {
+            fontSize: 12,
+            fontWeight: 600,
+            fill: "hsl(var(--foreground))",
+          },
+          labelBgStyle: {
+            fill: "hsl(var(--background))",
+            fillOpacity: 0.9,
           },
         });
       }
@@ -156,16 +166,17 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
                 <div className="text-xs text-muted-foreground truncate max-w-[140px] mt-1">
                   {node.displayName || node.nodeId}
                 </div>
-                {isStart && (
-                  <div className="text-xs text-blue-500 font-medium mt-1">subject</div>
-                )}
-                {isEnd && (
-                  <div className="text-xs text-destructive font-medium mt-1">blocked</div>
-                )}
+                <div className="text-xs font-medium mt-1" style={{ minHeight: "16px" }}>
+                  {isStart && <span className="text-blue-500">subject</span>}
+                  {isEnd && <span className="text-destructive">blocked</span>}
+                  {!isStart && !isEnd && (
+                    <span className="text-muted-foreground">hop {i}</span>
+                  )}
+                </div>
               </div>
             ),
           },
-          position: { x: i * 250, y: 100 },
+          position: { x: i * 280, y: 50 },
           sourcePosition: Position.Right,
           targetPosition: Position.Left,
           style: {
@@ -191,6 +202,15 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
             },
             style: {
               strokeDasharray: "5,5",
+            },
+            labelStyle: {
+              fontSize: 12,
+              fontWeight: 600,
+              fill: "hsl(var(--foreground))",
+            },
+            labelBgStyle: {
+              fill: "hsl(var(--background))",
+              fillOpacity: 0.9,
             },
           });
         }
