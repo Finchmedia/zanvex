@@ -101,6 +101,92 @@ booking.cancel = "parent->edit | booker"
 booking.delete = "parent->delete"
 ```
 
+## Demo Data Seeding
+
+### Quick Start
+
+Seed realistic demo data to explore Zanvex permissions:
+
+```bash
+# Seed catalogs + demo data in one command
+npx convex run seed:seedAll '{"includeDemoData": true}'
+
+# Or seed demo data separately (after catalogs)
+npx convex run seed:seedDemoData
+```
+
+This creates:
+- **2 Organizations**: Acme Studio, BetaCo Studio
+- **4 Users**: Alice (Acme admin), Bob (Acme member), Charlie (BetaCo admin), Diana (BetaCo member)
+- **4 Resources**: Studio A/B (Acme), Studio X/Y (BetaCo)
+- **8 Bookings**: 2 per resource (6 confirmed, 2 pending)
+- **24 Zanvex Tuples**: Auto-created via dual-write pattern
+
+### Demo Data Structure
+
+**Acme Studio (slug: "acme"):**
+- Alice (alice@acme.com) - Admin
+- Bob (bob@acme.com) - Member
+- Resources: Studio A, Studio B
+- Bookings:
+  - Studio A: Morning Session (Alice, +2d), Afternoon Session (Bob, +3d)
+  - Studio B: Evening Session (Alice, +5d), Night Session (Bob, +7d)
+
+**BetaCo Studio (slug: "betaco"):**
+- Charlie (charlie@betaco.com) - Admin
+- Diana (diana@betaco.com) - Member
+- Resources: Studio X, Studio Y
+- Bookings:
+  - Studio X: Weekend Session (Charlie, +10d), Weekday Session (Diana, +12d)
+  - Studio Y: Premium Session (Charlie, +15d), Standard Session (Diana, +18d)
+
+### Permission Testing Scenarios
+
+Use demo data to test Zanvex permissions:
+
+**Scenario 1: Org-wide resource access**
+- Alice (Acme admin) can view/edit all Acme resources
+- Bob (Acme member) can view Acme resources but not edit
+- Charlie cannot access Acme resources (different org)
+
+**Scenario 2: Booking permissions**
+- Alice can cancel her own bookings (direct booker)
+- Alice can cancel Bob's bookings (admin traversal: parent->edit)
+- Bob can cancel his own bookings (direct booker)
+- Bob cannot cancel Alice's bookings (member, not admin)
+
+**Scenario 3: Cross-org isolation**
+- Acme users have zero access to BetaCo resources/bookings
+- BetaCo users have zero access to Acme resources/bookings
+
+### Idempotency
+
+`seedDemoData()` is safe to run multiple times:
+- Checks for existing entities by email/slug/name
+- Skips creation if already exists
+- Returns existing IDs in result
+
+### Cleanup
+
+Remove demo data without affecting catalogs:
+
+```bash
+npx convex run seed:clearDemoData
+```
+
+This deletes:
+- All demo users (by email)
+- All demo orgs (by slug)
+- All demo resources (by name)
+- All demo bookings (by title)
+- All associated Zanvex tuples (auto-cleanup via app deletion functions)
+
+**Preserves:**
+- Permission catalog (12 permissions)
+- Relation catalog (11 relations)
+- Object types (4 types)
+- Permission rules (6 rules)
+
 ## Adding Custom Permissions or Relations
 
 You can extend the catalogs via the API:
