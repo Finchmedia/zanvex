@@ -98,7 +98,7 @@ async function checkWithPathInternal(
 }> {
   // Step 1: Direct check - does the exact tuple exist?
   const direct = await ctx.db
-    .query("relations")
+    .query("tuples")
     .withIndex("by_tuple", (q: any) =>
       q
         .eq("objectType", args.objectType)
@@ -120,7 +120,7 @@ async function checkWithPathInternal(
   // Step 2: 1-hop traversal
   // Find all groups/orgs the subject is a member of
   const allRelations = await ctx.db
-    .query("relations")
+    .query("tuples")
     .withIndex("by_subject", (q: any) =>
       q.eq("subjectType", args.subjectType).eq("subjectId", args.subjectId)
     )
@@ -137,7 +137,7 @@ async function checkWithPathInternal(
   // Step 3: Check if any membership grants access
   for (const membership of memberships) {
     const indirect = await ctx.db
-      .query("relations")
+      .query("tuples")
       .withIndex("by_tuple", (q: any) =>
         q
           .eq("objectType", args.objectType)
@@ -191,7 +191,7 @@ export const listSubjects = query({
   ),
   handler: async (ctx, args) => {
     const tuples = await ctx.db
-      .query("relations")
+      .query("tuples")
       .withIndex("by_object", (q) =>
         q
           .eq("objectType", args.objectType)
@@ -233,7 +233,7 @@ export const listRelations = query({
   ),
   handler: async (ctx, args) => {
     const tuples = await ctx.db
-      .query("relations")
+      .query("tuples")
       .withIndex("by_subject", (q) =>
         q.eq("subjectType", args.subjectType).eq("subjectId", args.subjectId)
       )
@@ -273,7 +273,7 @@ export const listTuplesForObject = query({
   ),
   handler: async (ctx, args) => {
     const tuples = await ctx.db
-      .query("relations")
+      .query("tuples")
       .withIndex("by_object", (q) =>
         q.eq("objectType", args.objectType).eq("objectId", args.objectId)
       )

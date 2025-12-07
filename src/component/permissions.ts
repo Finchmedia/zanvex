@@ -136,7 +136,7 @@ async function canRecursive(
     } else if (part.type === "computed") {
       // Find related objects via sourceRelation
       const related = await ctx.db
-        .query("relations")
+        .query("tuples")
         .withIndex("by_object", (q: any) =>
           q
             .eq("objectType", args.objectType)
@@ -192,7 +192,7 @@ async function checkDirectTuple(
   }
 ): Promise<boolean> {
   const tuple = await ctx.db
-    .query("relations")
+    .query("tuples")
     .withIndex("by_tuple", (q: any) =>
       q
         .eq("objectType", args.objectType)

@@ -9,7 +9,7 @@
  * maintains its own data AND mirrors permissions to Zanvex.
  */
 import { mutation, query } from "./_generated/server.js";
-import { components } from "./_generated/api.js";
+import { api, components } from "./_generated/api.js";
 import { createZanvexClient } from "@mrfinch/zanvex";
 import { v } from "convex/values";
 
@@ -707,6 +707,63 @@ export const canUserDoAction = query({
 });
 
 // ============================================
+// PERMISSION CATALOG
+// ============================================
+
+/**
+ * List all permissions (for UI dropdowns)
+ */
+export const listPermissions = query({
+  args: {},
+  handler: async (ctx) => {
+    return await zanvex.listPermissions(ctx);
+  },
+});
+
+/**
+ * Register a custom permission
+ */
+export const registerPermission = mutation({
+  args: {
+    name: v.string(),
+    label: v.string(),
+    description: v.optional(v.string()),
+    category: v.union(v.literal("crud"), v.literal("action")),
+  },
+  handler: async (ctx, args) => {
+    return await zanvex.registerPermission(ctx, args);
+  },
+});
+
+// ============================================
+// RELATION CATALOG
+// ============================================
+
+/**
+ * List all relation names (for UI dropdowns)
+ */
+export const listRelationNames = query({
+  args: {},
+  handler: async (ctx) => {
+    return await zanvex.listRelationNames(ctx);
+  },
+});
+
+/**
+ * Register a custom relation name
+ */
+export const registerRelationName = mutation({
+  args: {
+    name: v.string(),
+    label: v.string(),
+    description: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return await zanvex.registerRelationName(ctx, args);
+  },
+});
+
+// ============================================
 // OBJECT TYPES SCHEMA REGISTRY
 // ============================================
 
@@ -771,6 +828,60 @@ export const getRelationsForType = query({
 });
 
 /**
+ * Initialize permission catalog with default permissions
+ */
+export const initializePermissionCatalog = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // CRUD Operations
+    const crudPermissions = [
+      { name: "create", label: "Create", description: "Create new instances", category: "crud" as const },
+      { name: "read", label: "Read", description: "View/read instances", category: "crud" as const },
+      { name: "update", label: "Update", description: "Modify existing instances", category: "crud" as const },
+      { name: "delete", label: "Delete", description: "Remove instances", category: "crud" as const },
+    ];
+
+    // Common Actions
+    const actionPermissions = [
+      { name: "cancel", label: "Cancel", description: "Cancel/revoke an action", category: "action" as const },
+      { name: "reschedule", label: "Reschedule", description: "Change timing", category: "action" as const },
+      { name: "approve", label: "Approve", description: "Grant approval", category: "action" as const },
+      { name: "reject", label: "Reject", description: "Deny/reject", category: "action" as const },
+      { name: "publish", label: "Publish", description: "Make public", category: "action" as const },
+      { name: "archive", label: "Archive", description: "Archive/deactivate", category: "action" as const },
+    ];
+
+    for (const perm of [...crudPermissions, ...actionPermissions]) {
+      await zanvex.registerPermission(ctx, perm);
+    }
+  },
+});
+
+/**
+ * Initialize relation catalog with common relation names
+ */
+export const initializeRelationCatalog = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const relationNames = [
+      { name: "parent", label: "parent", description: "Parent/container relation" },
+      { name: "owner", label: "owner", description: "Ownership relation" },
+      { name: "member_of", label: "member_of", description: "Membership relation" },
+      { name: "admin_of", label: "admin_of", description: "Admin/manager relation" },
+      { name: "booker", label: "booker", description: "Who made the booking" },
+      { name: "assignee", label: "assignee", description: "Who is assigned/responsible" },
+      { name: "creator", label: "creator", description: "Who created this instance" },
+      { name: "viewer", label: "viewer", description: "Who can view" },
+      { name: "editor", label: "editor", description: "Who can edit" },
+    ];
+
+    for (const rel of relationNames) {
+      await zanvex.registerRelationName(ctx, rel);
+    }
+  },
+});
+
+/**
  * Initialize example object types for the demo app
  */
 export const initializeObjectTypes = mutation({
@@ -811,6 +922,24 @@ export const initializeObjectTypes = mutation({
         { name: "booker", targetType: "user", description: "The user who made the booking" },
       ],
     });
+  },
+});
+
+/**
+ * Initialize everything: catalogs, object types, and permission rules
+ */
+export const initializeAll = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Step 1: Initialize catalogs
+    await ctx.runMutation(api.app.initializePermissionCatalog, {});
+    await ctx.runMutation(api.app.initializeRelationCatalog, {});
+
+    // Step 2: Initialize object types
+    await ctx.runMutation(api.app.initializeObjectTypes, {});
+
+    // Step 3: Initialize permission rules
+    await ctx.runMutation(api.app.initializePermissionRules, {});
   },
 });
 

@@ -29,11 +29,11 @@ export const write = mutation({
     subjectType: v.string(),
     subjectId: v.string(),
   },
-  returns: v.id("relations"),
+  returns: v.id("tuples"),
   handler: async (ctx, args) => {
     // Check for existing tuple (idempotent write)
     const existing = await ctx.db
-      .query("relations")
+      .query("tuples")
       .withIndex("by_tuple", (q) =>
         q
           .eq("objectType", args.objectType)
@@ -49,7 +49,7 @@ export const write = mutation({
     }
 
     // Insert new tuple
-    return await ctx.db.insert("relations", {
+    return await ctx.db.insert("tuples", {
       objectType: args.objectType,
       objectId: args.objectId,
       relation: args.relation,
@@ -77,7 +77,7 @@ export const remove = mutation({
   returns: v.boolean(),
   handler: async (ctx, args) => {
     const existing = await ctx.db
-      .query("relations")
+      .query("tuples")
       .withIndex("by_tuple", (q) =>
         q
           .eq("objectType", args.objectType)
@@ -111,7 +111,7 @@ export const removeAllForObject = mutation({
   returns: v.number(),
   handler: async (ctx, args) => {
     const tuples = await ctx.db
-      .query("relations")
+      .query("tuples")
       .withIndex("by_object", (q) =>
         q.eq("objectType", args.objectType).eq("objectId", args.objectId)
       )
@@ -139,7 +139,7 @@ export const removeAllForSubject = mutation({
   returns: v.number(),
   handler: async (ctx, args) => {
     const tuples = await ctx.db
-      .query("relations")
+      .query("tuples")
       .withIndex("by_subject", (q) =>
         q.eq("subjectType", args.subjectType).eq("subjectId", args.subjectId)
       )
@@ -163,7 +163,7 @@ export const clearAll = mutation({
   args: {},
   returns: v.number(),
   handler: async (ctx) => {
-    const tuples = await ctx.db.query("relations").collect();
+    const tuples = await ctx.db.query("tuples").collect();
 
     for (const tuple of tuples) {
       await ctx.db.delete(tuple._id);

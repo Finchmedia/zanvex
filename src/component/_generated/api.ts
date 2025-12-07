@@ -11,7 +11,9 @@
 import type * as check from "../check.js";
 import type * as dsl from "../dsl.js";
 import type * as objectTypes from "../objectTypes.js";
+import type * as permissionCatalog from "../permissionCatalog.js";
 import type * as permissions from "../permissions.js";
+import type * as relationCatalog from "../relationCatalog.js";
 import type * as rules from "../rules.js";
 import type * as tuples from "../tuples.js";
 
@@ -26,7 +28,9 @@ const fullApi: ApiFromModules<{
   check: typeof check;
   dsl: typeof dsl;
   objectTypes: typeof objectTypes;
+  permissionCatalog: typeof permissionCatalog;
   permissions: typeof permissions;
+  relationCatalog: typeof relationCatalog;
   rules: typeof rules;
   tuples: typeof tuples;
 }> = anyApi as any;

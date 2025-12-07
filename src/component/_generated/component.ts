@@ -152,6 +152,39 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         Name
       >;
     };
+    permissionCatalog: {
+      deactivatePermission: FunctionReference<
+        "mutation",
+        "internal",
+        { name: string },
+        boolean,
+        Name
+      >;
+      listPermissions: FunctionReference<
+        "query",
+        "internal",
+        {},
+        Array<{
+          category: string;
+          description?: string;
+          label: string;
+          name: string;
+        }>,
+        Name
+      >;
+      registerPermission: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          category: "crud" | "action";
+          description?: string;
+          label: string;
+          name: string;
+        },
+        string,
+        Name
+      >;
+    };
     permissions: {
       can: FunctionReference<
         "query",
@@ -185,6 +218,29 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           update: boolean;
           view: boolean;
         },
+        Name
+      >;
+    };
+    relationCatalog: {
+      deactivateRelationName: FunctionReference<
+        "mutation",
+        "internal",
+        { name: string },
+        boolean,
+        Name
+      >;
+      listRelationNames: FunctionReference<
+        "query",
+        "internal",
+        {},
+        Array<{ description?: string; label: string; name: string }>,
+        Name
+      >;
+      registerRelationName: FunctionReference<
+        "mutation",
+        "internal",
+        { description?: string; label: string; name: string },
+        string,
         Name
       >;
     };

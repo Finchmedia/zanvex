@@ -34,7 +34,54 @@ export default defineSchema({
     ),
   }).index("by_name", ["name"]),
 
-  relations: defineTable({
+  /**
+   * Permission Catalog
+   *
+   * Registry of available permissions (CRUD + common actions).
+   * Users can add custom permissions specific to their domain.
+   *
+   * Example:
+   *   { name: "create", label: "Create", description: "Create new instances", category: "crud", isActive: true }
+   *   { name: "cancel", label: "Cancel", description: "Cancel/revoke an action", category: "action", isActive: true }
+   */
+  permission_catalog: defineTable({
+    name: v.string(),              // "create", "read", "update", "delete", "cancel", etc.
+    label: v.string(),             // "Create", "Read", "Update", "Delete", "Cancel"
+    description: v.optional(v.string()), // "Create new instances"
+    category: v.string(),          // "crud" or "action"
+    isActive: v.boolean(),         // Allow soft-delete without breaking existing rules
+  })
+    .index("by_name", ["name"])
+    .index("by_category", ["category"]),
+
+  /**
+   * Relation Name Catalog
+   *
+   * Registry of common relation names for ReBAC patterns.
+   * Provides suggestions for object type relations and ensures consistency.
+   *
+   * Example:
+   *   { name: "parent", label: "parent", description: "Parent/container relation", isActive: true }
+   *   { name: "owner", label: "owner", description: "Ownership relation", isActive: true }
+   */
+  relation_catalog: defineTable({
+    name: v.string(),              // "parent", "owner", "admin_of", etc.
+    label: v.string(),             // "parent", "owner", "admin_of"
+    description: v.optional(v.string()), // "Parent/container relation"
+    isActive: v.boolean(),
+  }).index("by_name", ["name"]),
+
+  /**
+   * Relationship Tuples
+   *
+   * Stores relationship tuples in Zanzibar format: (object, relation, subject)
+   *
+   * Example tuples:
+   *   - (resource:studio-a, owner, org:acme)     → "studio-a is owned by acme"
+   *   - (org:acme, member_of, user:daniel)       → "acme has member daniel"
+   *   - (booking:123, booker, user:mike)         → "booking 123 was made by mike"
+   */
+  tuples: defineTable({
     // The object being accessed (e.g., "resource", "org")
     objectType: v.string(),
     objectId: v.string(),

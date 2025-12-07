@@ -376,6 +376,102 @@ export function createZanvexClient(component: ComponentApi) {
     },
 
     // ============================================
+    // PERMISSION CATALOG
+    // ============================================
+
+    /**
+     * List all active permissions (for dropdowns)
+     *
+     * Returns permissions grouped by category (CRUD vs Actions).
+     *
+     * @example
+     * const permissions = await zanvex.listPermissions(ctx);
+     * // [
+     * //   { name: "create", label: "Create", category: "crud" },
+     * //   { name: "cancel", label: "Cancel", category: "action" }
+     * // ]
+     */
+    listPermissions: (ctx: QueryCtx) => {
+      return ctx.runQuery(component.permissionCatalog.listPermissions, {});
+    },
+
+    /**
+     * Register a custom permission
+     *
+     * @example
+     * await zanvex.registerPermission(ctx, {
+     *   name: "review",
+     *   label: "Review",
+     *   description: "Review and provide feedback",
+     *   category: "action"
+     * });
+     */
+    registerPermission: (
+      ctx: MutationCtx,
+      args: {
+        name: string;
+        label: string;
+        description?: string;
+        category: "crud" | "action";
+      }
+    ) => {
+      return ctx.runMutation(component.permissionCatalog.registerPermission, args);
+    },
+
+    /**
+     * Deactivate a permission (soft delete)
+     */
+    deactivatePermission: (ctx: MutationCtx, name: string) => {
+      return ctx.runMutation(component.permissionCatalog.deactivatePermission, { name });
+    },
+
+    // ============================================
+    // RELATION CATALOG
+    // ============================================
+
+    /**
+     * List all active relation names (for dropdowns)
+     *
+     * @example
+     * const relationNames = await zanvex.listRelationNames(ctx);
+     * // [
+     * //   { name: "parent", label: "parent", description: "Parent/container relation" },
+     * //   { name: "owner", label: "owner", description: "Ownership relation" }
+     * // ]
+     */
+    listRelationNames: (ctx: QueryCtx) => {
+      return ctx.runQuery(component.relationCatalog.listRelationNames, {});
+    },
+
+    /**
+     * Register a custom relation name
+     *
+     * @example
+     * await zanvex.registerRelationName(ctx, {
+     *   name: "reviewer",
+     *   label: "reviewer",
+     *   description: "Who reviews this instance"
+     * });
+     */
+    registerRelationName: (
+      ctx: MutationCtx,
+      args: {
+        name: string;
+        label: string;
+        description?: string;
+      }
+    ) => {
+      return ctx.runMutation(component.relationCatalog.registerRelationName, args);
+    },
+
+    /**
+     * Deactivate a relation name (soft delete)
+     */
+    deactivateRelationName: (ctx: MutationCtx, name: string) => {
+      return ctx.runMutation(component.relationCatalog.deactivateRelationName, { name });
+    },
+
+    // ============================================
     // THE MAGIC: ACTION-BASED PERMISSION CHECKS
     // ============================================
 
