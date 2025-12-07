@@ -63,6 +63,8 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
   }, []);
 
   // Transform path into React Flow nodes and edges
+  const nodeWidth = 180;
+  const edgeSpacing = 100;
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
@@ -75,6 +77,7 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
       const nodeId = `${node.nodeType}:${node.nodeId}`;
       const isStart = i === 0; // First node in reversed path (the user/subject)
       const isEnd = i === reversedPath.length - 1; // Last node (the target object)
+      const hopNumber = !isStart && !isEnd ? i : null;
 
       nodes.push({
         id: nodeId,
@@ -89,18 +92,18 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
               <div className="text-xs font-medium mt-1" style={{ minHeight: "16px" }}>
                 {isStart && <span className="text-blue-500">subject</span>}
                 {isEnd && <span className="text-purple-500">target</span>}
-                {!isStart && !isEnd && (
-                  <span className="text-muted-foreground">hop {i}</span>
+                {hopNumber && (
+                  <span className="text-muted-foreground">hop {hopNumber}</span>
                 )}
               </div>
             </div>
           ),
         },
-        position: { x: i * 280, y: 50 },
+        position: { x: i * (nodeWidth + edgeSpacing), y: 50 },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
         style: {
-          width: 180,
+          width: nodeWidth,
           padding: 0,
         },
       });
@@ -110,6 +113,8 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
         const nextNode = reversedPath[i + 1];
         // Get the relation from the next node in the reversed path
         const edgeLabel = nextNode.relation || "";
+
+        console.log(`Edge ${i}: ${nodeId} → ${nextNode.nodeType}:${nextNode.nodeId}, label: "${edgeLabel}"`);
 
         edges.push({
           id: `edge-${i}`,
@@ -155,6 +160,7 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
         const nodeId = `${node.nodeType}:${node.nodeId}`;
         const isStart = i === 0;
         const isEnd = i === reversedPath.length - 1;
+        const hopNumber = !isStart && !isEnd ? i : null;
 
         nodes.push({
           id: nodeId,
@@ -169,18 +175,18 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
                 <div className="text-xs font-medium mt-1" style={{ minHeight: "16px" }}>
                   {isStart && <span className="text-blue-500">subject</span>}
                   {isEnd && <span className="text-destructive">blocked</span>}
-                  {!isStart && !isEnd && (
-                    <span className="text-muted-foreground">hop {i}</span>
+                  {hopNumber && (
+                    <span className="text-muted-foreground">hop {hopNumber}</span>
                   )}
                 </div>
               </div>
             ),
           },
-          position: { x: i * 280, y: 50 },
+          position: { x: i * (nodeWidth + edgeSpacing), y: 50 },
           sourcePosition: Position.Right,
           targetPosition: Position.Left,
           style: {
-            width: 180,
+            width: nodeWidth,
             padding: 0,
           },
         });
@@ -188,11 +194,15 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
         // Create edge to next node
         if (i < reversedPath.length - 1) {
           const nextNode = reversedPath[i + 1];
+          const edgeLabel = nextNode.relation || "";
+
+          console.log(`Failed path edge ${i}: ${nodeId} → ${nextNode.nodeType}:${nextNode.nodeId}, label: "${edgeLabel}"`);
+
           edges.push({
             id: `edge-${i}`,
             source: nodeId,
             target: `${nextNode.nodeType}:${nextNode.nodeId}`,
-            label: nextNode.relation || "",
+            label: edgeLabel,
             type: "smoothstep",
             animated: false,
             markerEnd: {
@@ -218,6 +228,26 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
     }
   }
 
+  // Generate human-readable traversal sentence
+  const generateTraversalSentence = (): string | null => {
+    if (!data.path || data.path.length === 0) return null;
+
+    const reversedPath = [...data.path].reverse();
+    const parts: string[] = [];
+
+    reversedPath.forEach((node, i) => {
+      parts.push(node.displayName || node.nodeId);
+      if (i < reversedPath.length - 1) {
+        const nextNode = reversedPath[i + 1];
+        parts.push(nextNode.relation || "→");
+      }
+    });
+
+    return parts.join(" → ");
+  };
+
+  const traversalSentence = generateTraversalSentence();
+
   if (nodes.length === 0) {
     return (
       <div className="flex items-center justify-center h-[400px] text-muted-foreground">
@@ -227,30 +257,46 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
   }
 
   return (
-    <div style={{ width: "100%", height: "400px" }}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        fitView
-        minZoom={0.5}
-        maxZoom={1.5}
-        colorMode={colorMode}
-        attributionPosition="bottom-left"
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
-        edgesFocusable={false}
-        nodesFocusable={false}
-      >
-        <Background />
-        <Controls />
-        <MiniMap
-          nodeColor={(node) => {
-            return "hsl(var(--primary))";
-          }}
-          maskColor="hsl(var(--background) / 0.8)"
-        />
-      </ReactFlow>
-    </div>
+    <>
+      {traversalSentence && (
+        <div className="mb-4 p-3 bg-muted/50 rounded-lg border">
+          <p className="text-sm font-mono">
+            <span className="font-semibold">Path: </span>
+            {traversalSentence}
+          </p>
+          {data.matchedRule && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Matched rule: <code className="bg-muted px-1 rounded">{data.matchedRule}</code>
+            </p>
+          )}
+        </div>
+      )}
+
+      <div style={{ width: "100%", height: "400px" }}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          fitView
+          minZoom={0.5}
+          maxZoom={1.5}
+          colorMode={colorMode}
+          attributionPosition="bottom-left"
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={false}
+          edgesFocusable={false}
+          nodesFocusable={false}
+        >
+          <Background />
+          <Controls />
+          <MiniMap
+            nodeColor={(node) => {
+              return "hsl(var(--primary))";
+            }}
+            maskColor="hsl(var(--background) / 0.8)"
+          />
+        </ReactFlow>
+      </div>
+    </>
   );
 }
