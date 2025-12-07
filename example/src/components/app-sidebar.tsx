@@ -47,24 +47,18 @@ interface NavSection {
 const navData: { sections: NavSection[] } = {
   sections: [
     {
-      title: "Data",
+      title: "Main App",
       items: [
         { title: "App Data", icon: Database, page: "app-data" },
-        { title: "Relationship Tuples", icon: GitBranch, page: "tuples" },
       ],
     },
     {
-      title: "Permissions",
+      title: "Zanvex",
       items: [
-        { title: "Permission Rules", icon: Shield, page: "permission-rules" },
         { title: "Permission Tester", icon: TestTube, page: "permission-tester" },
-      ],
-    },
-    {
-      title: "Schema",
-      items: [
         { title: "Object Types", icon: Boxes, page: "object-types" },
-        { title: "Graph View", icon: Network, page: "graph" },
+        { title: "Permission Rules", icon: Shield, page: "permission-rules" },
+        { title: "Schema Graph", icon: Network, page: "graph" },
       ],
     },
   ],

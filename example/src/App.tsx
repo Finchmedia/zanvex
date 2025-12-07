@@ -17,7 +17,6 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SelectionProvider } from "@/contexts/selection-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AppDataPage } from "@/pages/app-data";
-import { TuplesPage } from "@/pages/tuples";
 import { PermissionRulesPage } from "@/pages/permission-rules";
 import { PermissionTesterPage } from "@/pages/permission-tester";
 import { ObjectTypesPage } from "@/pages/object-types";
@@ -26,7 +25,6 @@ import { SettingsPage } from "@/pages/settings";
 
 type Page =
   | "app-data"
-  | "tuples"
   | "permission-rules"
   | "permission-tester"
   | "object-types"
@@ -40,43 +38,36 @@ const pageMetadata: Record<
   "app-data": {
     title: "App Data",
     breadcrumbs: [
-      { label: "Data", href: "#" },
+      { label: "Main App", href: "#" },
       { label: "App Data" },
-    ],
-  },
-  tuples: {
-    title: "Relationship Tuples",
-    breadcrumbs: [
-      { label: "Data", href: "#" },
-      { label: "Tuples" },
-    ],
-  },
-  "permission-rules": {
-    title: "Permission Rules",
-    breadcrumbs: [
-      { label: "Permissions", href: "#" },
-      { label: "Rules" },
     ],
   },
   "permission-tester": {
     title: "Permission Tester",
     breadcrumbs: [
-      { label: "Permissions", href: "#" },
-      { label: "Tester" },
+      { label: "Zanvex", href: "#" },
+      { label: "Permission Tester" },
     ],
   },
   "object-types": {
     title: "Object Types",
     breadcrumbs: [
-      { label: "Schema", href: "#" },
+      { label: "Zanvex", href: "#" },
       { label: "Object Types" },
     ],
   },
-  graph: {
-    title: "Graph Visualization",
+  "permission-rules": {
+    title: "Permission Rules",
     breadcrumbs: [
-      { label: "Schema", href: "#" },
-      { label: "Graph" },
+      { label: "Zanvex", href: "#" },
+      { label: "Permission Rules" },
+    ],
+  },
+  graph: {
+    title: "Schema Graph",
+    breadcrumbs: [
+      { label: "Zanvex", href: "#" },
+      { label: "Schema Graph" },
     ],
   },
   settings: {
@@ -86,26 +77,24 @@ const pageMetadata: Record<
 };
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>("app-data");
+  const [currentPage, setCurrentPage] = useState<Page>("permission-tester");
 
   const renderPage = () => {
     switch (currentPage) {
       case "app-data":
         return <AppDataPage />;
-      case "tuples":
-        return <TuplesPage />;
-      case "permission-rules":
-        return <PermissionRulesPage />;
       case "permission-tester":
         return <PermissionTesterPage />;
       case "object-types":
         return <ObjectTypesPage />;
+      case "permission-rules":
+        return <PermissionRulesPage />;
       case "graph":
         return <GraphPage />;
       case "settings":
         return <SettingsPage />;
       default:
-        return <AppDataPage />;
+        return <PermissionTesterPage />;
     }
   };
 
