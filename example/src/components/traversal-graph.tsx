@@ -7,6 +7,7 @@ import {
   Controls,
   MiniMap,
   MarkerType,
+  Position,
   type ColorMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -94,6 +95,8 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
           ),
         },
         position: { x: i * 250, y: 100 },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
         style: {
           width: 180,
           padding: 0,
@@ -162,6 +165,8 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
             ),
           },
           position: { x: i * 250, y: 100 },
+          sourcePosition: Position.Right,
+          targetPosition: Position.Left,
           style: {
             width: 180,
             padding: 0,
