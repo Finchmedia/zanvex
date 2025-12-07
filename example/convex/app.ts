@@ -730,16 +730,16 @@ export const canWithPath = query({
       try {
         if (nodeType === "user") {
           const user = await ctx.db.get(nodeId as any);
-          return user?.name || nodeId;
+          return (user as any)?.name || nodeId;
         } else if (nodeType === "org") {
           const org = await ctx.db.get(nodeId as any);
-          return org?.name || nodeId;
+          return (org as any)?.name || nodeId;
         } else if (nodeType === "resource") {
           const resource = await ctx.db.get(nodeId as any);
-          return resource?.name || nodeId;
+          return (resource as any)?.name || nodeId;
         } else if (nodeType === "booking") {
           const booking = await ctx.db.get(nodeId as any);
-          return booking?.title || nodeId;
+          return (booking as any)?.title || nodeId;
         }
         return nodeId;
       } catch {
