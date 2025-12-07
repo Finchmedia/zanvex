@@ -14,13 +14,17 @@
  *   npx convex run seed:seedPermissionRules
  */
 
-import { internalMutation } from "./_generated/server.js";
-import { internal, api } from "./_generated/api.js";
+import { mutation } from "./_generated/server.js";
+import { api } from "./_generated/api.js";
+import { createZanvexClient } from "@mrfinch/zanvex";
+import { components } from "./_generated/api.js";
+
+const zanvex = createZanvexClient(components.zanvex);
 
 /**
  * Seed permission catalog with CRUD + common actions
  */
-export const seedPermissions = internalMutation({
+export const seedPermissions = mutation({
   args: {},
   handler: async (ctx) => {
     const permissions = [
@@ -41,31 +45,19 @@ export const seedPermissions = internalMutation({
       { name: "archive", label: "Archive", description: "Archive/deactivate", category: "action" as const },
     ];
 
-    let created = 0;
     for (const perm of permissions) {
-      const existing = await ctx.db
-        .query("permission_catalog")
-        .withIndex("by_name", (q) => q.eq("name", perm.name))
-        .first();
-
-      if (!existing) {
-        await ctx.db.insert("permission_catalog", {
-          ...perm,
-          isActive: true,
-        });
-        created++;
-      }
+      await zanvex.registerPermission(ctx, perm);
     }
 
-    console.log(`Seeded ${created} permissions (${permissions.length - created} already existed)`);
-    return { created, total: permissions.length };
+    console.log(`Seeded ${permissions.length} permissions`);
+    return { total: permissions.length };
   },
 });
 
 /**
  * Seed relation catalog with common ReBAC patterns
  */
-export const seedRelations = internalMutation({
+export const seedRelations = mutation({
   args: {},
   handler: async (ctx) => {
     const relationNames = [
@@ -89,73 +81,63 @@ export const seedRelations = internalMutation({
       { name: "collaborator", label: "collaborator", description: "Who can collaborate" },
     ];
 
-    let created = 0;
     for (const rel of relationNames) {
-      const existing = await ctx.db
-        .query("relation_catalog")
-        .withIndex("by_name", (q) => q.eq("name", rel.name))
-        .first();
-
-      if (!existing) {
-        await ctx.db.insert("relation_catalog", {
-          ...rel,
-          isActive: true,
-        });
-        created++;
-      }
+      await zanvex.registerRelationName(ctx, rel);
     }
 
-    console.log(`Seeded ${created} relations (${relationNames.length - created} already existed)`);
-    return { created, total: relationNames.length };
+    console.log(`Seeded ${relationNames.length} relations`);
+    return { total: relationNames.length };
   },
 });
 
 /**
  * Seed object types for booking system example
  */
-export const seedObjectTypes = internalMutation({
+export const seedObjectTypes = mutation({
   args: {},
   handler: async (ctx) => {
     await ctx.runMutation(api.app.initializeObjectTypes, {});
     console.log("Seeded object types (user, org, resource, booking)");
+    return { total: 4 };
   },
 });
 
 /**
  * Seed permission rules for booking system example
  */
-export const seedPermissionRules = internalMutation({
+export const seedPermissionRules = mutation({
   args: {},
   handler: async (ctx) => {
     await ctx.runMutation(api.app.initializePermissionRules, {});
     console.log("Seeded permission rules");
+    return { total: 6 };
   },
 });
 
 /**
  * Seed everything at once
  */
-export const seedAll = internalMutation({
+export const seedAll = mutation({
   args: {},
   handler: async (ctx) => {
     console.log("🌱 Starting Zanvex database seed...\n");
 
     // Step 1: Seed catalogs
     console.log("📋 Seeding catalogs...");
-    const permResult = await ctx.runMutation(internal.seed.seedPermissions, {});
-    const relResult = await ctx.runMutation(internal.seed.seedRelations, {});
+    const permResult = await ctx.runMutation(api.seed.seedPermissions, {});
+    const relResult = await ctx.runMutation(api.seed.seedRelations, {});
 
     // Step 2: Seed object types
     console.log("\n📦 Seeding object types...");
-    await ctx.runMutation(internal.seed.seedObjectTypes, {});
+    await ctx.runMutation(api.seed.seedObjectTypes, {});
 
     // Step 3: Seed permission rules
     console.log("\n🔐 Seeding permission rules...");
-    await ctx.runMutation(internal.seed.seedPermissionRules, {});
+    await ctx.runMutation(api.seed.seedPermissionRules, {});
 
     console.log("\n✅ Database seeding complete!");
-    console.log(`   - Permissions: ${permResult.created}/${permResult.total} created`);
-    console.log(`   - Relations: ${relResult.created}/${relResult.total} created`);
+    console.log(`   - Permissions: ${permResult.total}`);
+    console.log(`   - Relations: ${relResult.total}`);
     console.log(`   - Object types: 4 (user, org, resource, booking)`);
     console.log(`   - Permission rules: 6\n`);
 
@@ -166,19 +148,3 @@ export const seedAll = internalMutation({
   },
 });
 
-/**
- * Clear all catalog data (use with caution!)
- */
-export const clearCatalogs = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const permissions = await ctx.db.query("permission_catalog").collect();
-    const relations = await ctx.db.query("relation_catalog").collect();
-
-    for (const p of permissions) await ctx.db.delete(p._id);
-    for (const r of relations) await ctx.db.delete(r._id);
-
-    console.log(`Cleared ${permissions.length} permissions and ${relations.length} relations`);
-    return { permissions: permissions.length, relations: relations.length };
-  },
-});

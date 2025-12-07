@@ -115,7 +115,7 @@ describe("Zanvex ReBAC", () => {
       orgId: "acme",
     });
     expect(members).toHaveLength(2);
-    expect(members.map((m) => m.subjectId).sort()).toEqual(["alice", "bob"]);
+    expect(members.map((m: any) => m.subjectId).sort()).toEqual(["alice", "bob"]);
   });
 
   test("setupDemo creates expected structure", async () => {
