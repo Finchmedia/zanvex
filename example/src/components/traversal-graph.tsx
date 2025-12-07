@@ -215,6 +215,11 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
         maxZoom={1.5}
         colorMode={colorMode}
         attributionPosition="bottom-left"
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable={false}
+        edgesFocusable={false}
+        nodesFocusable={false}
       >
         <Background />
         <Controls />
