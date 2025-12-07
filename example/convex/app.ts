@@ -719,11 +719,65 @@ export const canWithPath = query({
     objectId: v.string(),
   },
   handler: async (ctx, { userId, action, objectType, objectId }) => {
-    return await zanvex.canWithPath(ctx, {
+    const result = await zanvex.canWithPath(ctx, {
       subject: { type: "user", id: userId },
       action,
       object: { type: objectType, id: objectId },
     });
+
+    // Helper to get display name for an entity
+    const getDisplayName = async (nodeType: string, nodeId: string): Promise<string> => {
+      try {
+        if (nodeType === "user") {
+          const user = await ctx.db.get(nodeId as any);
+          return user?.name || nodeId;
+        } else if (nodeType === "org") {
+          const org = await ctx.db.get(nodeId as any);
+          return org?.name || nodeId;
+        } else if (nodeType === "resource") {
+          const resource = await ctx.db.get(nodeId as any);
+          return resource?.name || nodeId;
+        } else if (nodeType === "booking") {
+          const booking = await ctx.db.get(nodeId as any);
+          return booking?.title || nodeId;
+        }
+        return nodeId;
+      } catch {
+        return nodeId;
+      }
+    };
+
+    // Enrich path with display names
+    if (result.path) {
+      const enrichedPath = await Promise.all(
+        result.path.map(async (node) => ({
+          ...node,
+          displayName: await getDisplayName(node.nodeType, node.nodeId),
+        }))
+      );
+      result.path = enrichedPath;
+    }
+
+    // Enrich tried paths with display names
+    if (result.triedPaths) {
+      const enrichedTriedPaths = await Promise.all(
+        result.triedPaths.map(async (triedPath) => {
+          if (triedPath.partialPath) {
+            const enrichedPartialPath = await Promise.all(
+              triedPath.partialPath.map(async (node) => ({
+                ...node,
+                displayName: await getDisplayName(node.nodeType, node.nodeId),
+              }))
+            );
+            return { ...triedPath, partialPath: enrichedPartialPath };
+          }
+          return triedPath;
+        })
+      );
+      result.triedPaths = enrichedTriedPaths;
+    }
+
+    return result;
   },
 });
 

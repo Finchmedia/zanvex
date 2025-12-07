@@ -15,6 +15,7 @@ import "@xyflow/react/dist/style.css";
 interface TraversalNode {
   nodeType: string;
   nodeId: string;
+  displayName?: string;
   relation?: string;
   permission?: string;
   depth: number;
@@ -83,7 +84,7 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
             <div className="px-4 py-2">
               <div className="font-semibold text-sm">{node.nodeType}</div>
               <div className="text-xs text-muted-foreground truncate max-w-[140px] mt-1">
-                {node.nodeId}
+                {node.displayName || node.nodeId}
               </div>
               {isStart && (
                 <div className="text-xs text-blue-500 font-medium mt-1">subject</div>
@@ -153,7 +154,7 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
               <div className="px-4 py-2">
                 <div className="font-semibold text-sm">{node.nodeType}</div>
                 <div className="text-xs text-muted-foreground truncate max-w-[140px] mt-1">
-                  {node.nodeId}
+                  {node.displayName || node.nodeId}
                 </div>
                 {isStart && (
                   <div className="text-xs text-blue-500 font-medium mt-1">subject</div>
