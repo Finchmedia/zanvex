@@ -199,6 +199,41 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         { allowed: boolean; path?: Array<string>; reason?: string },
         Name
       >;
+      canWithPath: FunctionReference<
+        "query",
+        "internal",
+        {
+          action: string;
+          objectId: string;
+          objectType: string;
+          subjectId: string;
+          subjectType: string;
+        },
+        {
+          allowed: boolean;
+          matchedRule?: string;
+          path?: Array<{
+            depth: number;
+            nodeId: string;
+            nodeType: string;
+            permission?: string;
+            relation?: string;
+          }>;
+          reason: string;
+          triedPaths?: Array<{
+            failureReason: string;
+            partialPath?: Array<{
+              depth: number;
+              nodeId: string;
+              nodeType: string;
+              permission?: string;
+              relation?: string;
+            }>;
+            rulePart: string;
+          }>;
+        },
+        Name
+      >;
       getPermissionsForObject: FunctionReference<
         "query",
         "internal",

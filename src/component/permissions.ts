@@ -24,6 +24,35 @@ import { query } from "./_generated/server.js";
 const MAX_DEPTH = 10;
 
 /**
+ * Path Tracking Types for Traversal Visualization
+ */
+
+/** Represents a node in the permission check traversal path */
+interface TraversalNode {
+  nodeType: string;      // "user", "org", "resource", "booking"
+  nodeId: string;        // ID of the node
+  relation?: string;     // Relation used to reach this node ("admin_of", "owner", "parent")
+  permission?: string;   // Permission checked at this node (for computed permissions)
+  depth: number;         // Depth in traversal (0 = starting point)
+}
+
+/** Represents an attempted path that failed during permission check */
+interface TriedPath {
+  rulePart: string;           // Which DSL rule part was tried (e.g., "parent->edit")
+  failureReason: string;      // Why it failed
+  partialPath?: TraversalNode[]; // How far we got before failing
+}
+
+/** Enhanced result with full traversal path information */
+interface PathResult {
+  allowed: boolean;
+  reason: string;               // Human-readable explanation
+  matchedRule?: string;         // DSL expression that succeeded (e.g., "parent->edit")
+  path?: TraversalNode[];       // Only present if allowed - the successful path
+  triedPaths?: TriedPath[];     // Only present if denied - failed attempts
+}
+
+/**
  * Check if a subject can perform an action/permission on an object
  *
  * This is the main API for permission checks.
@@ -55,6 +84,67 @@ export const can = query({
   }),
   handler: async (ctx, args) => {
     return await canRecursive(ctx, args, 0, []);
+  },
+});
+
+/**
+ * Check permissions with detailed traversal path information
+ *
+ * Returns rich debugging information including:
+ * - Exact path taken through object graph
+ * - Which rule granted access
+ * - Detailed failure information (if denied)
+ *
+ * Use this for debugging, audit logs, or UI permission explorers/graphs.
+ *
+ * @example
+ * // Check with full path tracking
+ * const result = await zanvex.canWithPath(ctx, {
+ *   subject: { type: "user", id: "daniel" },
+ *   action: "cancel",
+ *   object: { type: "booking", id: "booking-123" },
+ * });
+ *
+ * if (result.allowed) {
+ *   console.log("Allowed via:", result.matchedRule);
+ *   console.log("Path:", result.path);
+ * } else {
+ *   console.log("Denied. Tried:", result.triedPaths);
+ * }
+ */
+export const canWithPath = query({
+  args: {
+    objectType: v.string(),
+    objectId: v.string(),
+    action: v.string(),
+    subjectType: v.string(),
+    subjectId: v.string(),
+  },
+  returns: v.object({
+    allowed: v.boolean(),
+    reason: v.string(),
+    matchedRule: v.optional(v.string()),
+    path: v.optional(v.array(v.object({
+      nodeType: v.string(),
+      nodeId: v.string(),
+      relation: v.optional(v.string()),
+      permission: v.optional(v.string()),
+      depth: v.number()
+    }))),
+    triedPaths: v.optional(v.array(v.object({
+      rulePart: v.string(),
+      failureReason: v.string(),
+      partialPath: v.optional(v.array(v.object({
+        nodeType: v.string(),
+        nodeId: v.string(),
+        relation: v.optional(v.string()),
+        permission: v.optional(v.string()),
+        depth: v.number()
+      })))
+    })))
+  }),
+  handler: async (ctx, args) => {
+    return await canRecursiveWithPath(ctx, args, 0, [], []);
   },
 });
 
@@ -179,6 +269,183 @@ async function canRecursive(
 }
 
 /**
+ * Enhanced recursive implementation with detailed path tracking
+ *
+ * Returns structured path information for graph visualization and debugging.
+ */
+async function canRecursiveWithPath(
+  ctx: any,
+  args: {
+    objectType: string;
+    objectId: string;
+    action: string;
+    subjectType: string;
+    subjectId: string;
+  },
+  depth: number,
+  path: TraversalNode[],
+  triedPaths: TriedPath[]
+): Promise<PathResult> {
+  // Prevent infinite loops
+  if (depth > MAX_DEPTH) {
+    return {
+      allowed: false,
+      reason: "Max traversal depth exceeded",
+      triedPaths: [{
+        rulePart: "depth-check",
+        failureReason: `Exceeded MAX_DEPTH=${MAX_DEPTH}`,
+        partialPath: path
+      }]
+    };
+  }
+
+  // Add current node to path
+  const currentNode: TraversalNode = {
+    nodeType: args.objectType,
+    nodeId: args.objectId,
+    permission: args.action,
+    depth
+  };
+  const currentPath = [...path, currentNode];
+
+  // 1. Look up permission rule
+  const rule = await ctx.db
+    .query("permission_rules")
+    .withIndex("by_type_permission", (q: any) =>
+      q.eq("objectType", args.objectType).eq("permission", args.action)
+    )
+    .first();
+
+  // 2. No rule? Default to direct relation check
+  if (!rule) {
+    const direct = await checkDirectTuple(ctx, {
+      objectType: args.objectType,
+      objectId: args.objectId,
+      relation: args.action,
+      subjectType: args.subjectType,
+      subjectId: args.subjectId,
+    });
+
+    return {
+      allowed: direct,
+      reason: direct
+        ? `Direct ${args.action} relation`
+        : `No ${args.action} relation found`,
+      matchedRule: direct ? args.action : undefined,
+      path: direct ? [...currentPath, {
+        nodeType: args.subjectType,
+        nodeId: args.subjectId,
+        relation: args.action,
+        depth: depth + 1
+      }] : undefined,
+      triedPaths: direct ? undefined : [{
+        rulePart: args.action,
+        failureReason: "No matching tuple found",
+        partialPath: currentPath
+      }]
+    };
+  }
+
+  // 3. Evaluate rules (OR logic)
+  for (const part of rule.rules) {
+    if (part.type === "direct") {
+      const hasTuple = await checkDirectTuple(ctx, {
+        objectType: args.objectType,
+        objectId: args.objectId,
+        relation: part.relation!,
+        subjectType: args.subjectType,
+        subjectId: args.subjectId,
+      });
+
+      if (hasTuple) {
+        return {
+          allowed: true,
+          reason: `Direct ${part.relation} relation`,
+          matchedRule: part.relation!,
+          path: [...currentPath, {
+            nodeType: args.subjectType,
+            nodeId: args.subjectId,
+            relation: part.relation!,
+            depth: depth + 1
+          }]
+        };
+      } else {
+        triedPaths.push({
+          rulePart: part.relation!,
+          failureReason: "No matching tuple found",
+          partialPath: currentPath
+        });
+      }
+    } else if (part.type === "computed") {
+      // Find related objects via sourceRelation
+      const related = await ctx.db
+        .query("tuples")
+        .withIndex("by_object", (q: any) =>
+          q
+            .eq("objectType", args.objectType)
+            .eq("objectId", args.objectId)
+            .eq("relation", part.sourceRelation)
+        )
+        .collect();
+
+      if (related.length === 0) {
+        triedPaths.push({
+          rulePart: `${part.sourceRelation}->${part.targetPermission}`,
+          failureReason: `No ${part.sourceRelation} relation found`,
+          partialPath: currentPath
+        });
+        continue;
+      }
+
+      // Try each related object
+      for (const rel of related) {
+        const relationNode: TraversalNode = {
+          nodeType: rel.subjectType,
+          nodeId: rel.subjectId,
+          relation: part.sourceRelation,
+          depth: depth + 1
+        };
+
+        const result = await canRecursiveWithPath(
+          ctx,
+          {
+            objectType: rel.subjectType,
+            objectId: rel.subjectId,
+            action: part.targetPermission!,
+            subjectType: args.subjectType,
+            subjectId: args.subjectId,
+          },
+          depth + 1,
+          [...currentPath, relationNode],
+          []
+        );
+
+        if (result.allowed) {
+          return {
+            allowed: true,
+            reason: `${part.sourceRelation}->${part.targetPermission}`,
+            matchedRule: `${part.sourceRelation}->${part.targetPermission}`,
+            path: result.path
+          };
+        } else {
+          triedPaths.push({
+            rulePart: `${part.sourceRelation}->${part.targetPermission}`,
+            failureReason: result.reason,
+            partialPath: result.triedPaths?.[0]?.partialPath
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    allowed: false,
+    reason: "No matching rule granted access",
+    triedPaths
+  };
+}
+
+/**
  * Check if a direct relation tuple exists
  */
 async function checkDirectTuple(
@@ -240,16 +507,12 @@ export const getPermissionsForObject = query({
     actions: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
-    // Standard permissions to check
-    const standardPermissions = [
-      "create",
-      "read",
-      "update",
-      "delete",
-      "view",
-      "edit",
-      "cancel",
-    ];
+    // Fetch active permissions from catalog (dynamic, not hardcoded)
+    const catalogPermissions = await ctx.db
+      .query("permission_catalog")
+      .filter((q: any) => q.eq(q.field("isActive"), true))
+      .collect();
+    const standardPermissions = catalogPermissions.map((p: any) => p.name);
 
     // Also get any custom permissions defined for this object type
     const rules = await ctx.db

@@ -518,6 +518,47 @@ export function createZanvexClient(component: ComponentApi) {
     },
 
     /**
+     * Check permissions with detailed traversal path tracking
+     *
+     * Returns comprehensive debugging information including:
+     * - Exact path taken through the object graph
+     * - Which rule granted access
+     * - Detailed failure information for denied permissions
+     *
+     * Use this for debugging, audit logs, or UI permission tester/graph visualizations.
+     *
+     * @example
+     * const result = await zanvex.canWithPath(ctx, {
+     *   subject: { type: "user", id: "daniel" },
+     *   action: "cancel",
+     *   object: { type: "booking", id: "booking-123" },
+     * });
+     *
+     * if (result.allowed) {
+     *   console.log("Allowed via:", result.matchedRule);
+     *   console.log("Path:", result.path);
+     * } else {
+     *   console.log("Denied. Tried paths:", result.triedPaths);
+     * }
+     */
+    canWithPath: (
+      ctx: QueryCtx,
+      args: {
+        subject: SubjectRef;
+        action: string;
+        object: ObjectRef;
+      }
+    ) => {
+      return ctx.runQuery(component.permissions.canWithPath, {
+        objectType: args.object.type,
+        objectId: args.object.id,
+        action: args.action,
+        subjectType: args.subject.type,
+        subjectId: args.subject.id,
+      });
+    },
+
+    /**
      * Get all permissions a subject has on an object
      *
      * Returns { create, read, update, delete, cancel, actions, relation }
@@ -548,3 +589,35 @@ export function createZanvexClient(component: ComponentApi) {
 
 // Re-export types for convenience
 export type { ComponentApi };
+
+/**
+ * Traversal Path Tracking Types
+ *
+ * These types are used by canWithPath() to provide detailed information
+ * about permission check paths for debugging and visualization.
+ */
+
+/** Represents a node in the permission check traversal path */
+export interface TraversalNode {
+  nodeType: string;      // "user", "org", "resource", "booking"
+  nodeId: string;        // ID of the node
+  relation?: string;     // Relation used to reach this node
+  permission?: string;   // Permission checked at this node
+  depth: number;         // Depth in traversal (0 = starting point)
+}
+
+/** Represents an attempted path that failed during permission check */
+export interface TriedPath {
+  rulePart: string;           // Which DSL rule part was tried
+  failureReason: string;      // Why it failed
+  partialPath?: TraversalNode[]; // How far we got before failing
+}
+
+/** Enhanced result with full traversal path information */
+export interface PathResult {
+  allowed: boolean;
+  reason: string;               // Human-readable explanation
+  matchedRule?: string;         // DSL expression that succeeded
+  path?: TraversalNode[];       // Successful path (if allowed)
+  triedPaths?: TriedPath[];     // Failed attempts (if denied)
+}
