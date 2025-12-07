@@ -111,8 +111,8 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
       // Create edge to next node (in reversed order)
       if (i < reversedPath.length - 1) {
         const nextNode = reversedPath[i + 1];
-        // Get the relation from the next node in the reversed path
-        const edgeLabel = nextNode.relation || "";
+        // Get the relation from the CURRENT node (it describes the edge used to reach it)
+        const edgeLabel = node.relation || "";
 
         console.log(`Edge ${i}: ${nodeId} → ${nextNode.nodeType}:${nextNode.nodeId}, label: "${edgeLabel}"`);
 
@@ -130,15 +130,6 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
           },
           style: data.allowed ? undefined : {
             strokeDasharray: "5,5",
-          },
-          labelStyle: {
-            fontSize: 12,
-            fontWeight: 600,
-            fill: "hsl(var(--foreground))",
-          },
-          labelBgStyle: {
-            fill: "hsl(var(--background))",
-            fillOpacity: 0.9,
           },
         });
       }
@@ -194,7 +185,8 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
         // Create edge to next node
         if (i < reversedPath.length - 1) {
           const nextNode = reversedPath[i + 1];
-          const edgeLabel = nextNode.relation || "";
+          // Get the relation from the CURRENT node (it describes the edge used to reach it)
+          const edgeLabel = node.relation || "";
 
           console.log(`Failed path edge ${i}: ${nodeId} → ${nextNode.nodeType}:${nextNode.nodeId}, label: "${edgeLabel}"`);
 
@@ -212,15 +204,6 @@ export function TraversalGraph({ data }: TraversalGraphProps) {
             },
             style: {
               strokeDasharray: "5,5",
-            },
-            labelStyle: {
-              fontSize: 12,
-              fontWeight: 600,
-              fill: "hsl(var(--foreground))",
-            },
-            labelBgStyle: {
-              fill: "hsl(var(--background))",
-              fillOpacity: 0.9,
             },
           });
         }

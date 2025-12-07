@@ -299,14 +299,16 @@ async function canRecursiveWithPath(
     };
   }
 
-  // Add current node to path
-  const currentNode: TraversalNode = {
-    nodeType: args.objectType,
-    nodeId: args.objectId,
-    permission: args.action,
-    depth
-  };
-  const currentPath = [...path, currentNode];
+  // Only add current node for the initial target object (when path is empty)
+  // For recursive calls, the node was already added as a relationNode by the parent
+  const currentPath = path.length === 0
+    ? [...path, {
+        nodeType: args.objectType,
+        nodeId: args.objectId,
+        permission: args.action,
+        depth
+      }]
+    : path;
 
   // 1. Look up permission rule
   const rule = await ctx.db
