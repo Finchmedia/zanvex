@@ -535,7 +535,12 @@ export const seedFresh = mutation({
   args: {
     includeDemoData: v.optional(v.boolean()),
   },
-  handler: async (ctx, { includeDemoData = true }) => {
+  handler: async (ctx, { includeDemoData = true }): Promise<{
+    permissions?: any;
+    relations?: any;
+    demoData?: any;
+    warning: string;
+  }> => {
     console.log("🔥 NUCLEAR SEED: Clearing all data...\n");
 
     // Clear all app tables
@@ -549,7 +554,7 @@ export const seedFresh = mutation({
     console.log("🌱 Re-seeding everything from scratch...\n");
 
     // Re-seed everything
-    const result = await ctx.runMutation(internal.seed.seedAll, {
+    const result: any = await ctx.runMutation(internal.seed.seedAll, {
       includeDemoData
     });
 
