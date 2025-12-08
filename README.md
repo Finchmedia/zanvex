@@ -27,19 +27,28 @@ cd zanvex
 npm install
 ```
 
-### 2. Set Up Convex
-
-On first run, you'll need to create a Convex project:
+### 2. Generate Component Types
 
 ```bash
-npx convex dev
-# Follow prompts to:
-# - Log in or create a Convex account
-# - Create or link a project
-# This creates .env.local with your deployment URL
+npx convex codegen --component-dir ./src/component
 ```
 
-### 3. Seed Demo Data
+This generates TypeScript types for the component before the first build.
+
+### 3. Set Up Convex & Start Dev Servers
+
+```bash
+npm run dev
+```
+
+On first run, this will:
+- Prompt you to create/link a Convex project
+- Create `.env.local` with your deployment URL
+- Build the component
+- Start Convex backend
+- Start Vite frontend
+
+### 4. Seed Demo Data
 
 Populate the database with demo organizations, users, resources, and bookings:
 
@@ -54,17 +63,6 @@ This creates:
 - 4 resources (Studio A, B, X, Y)
 - 4 bookings (1 per resource)
 - 11 permission rules (org, resource, booking CRUD)
-
-### 4. Start Development Servers
-
-```bash
-npm run dev
-```
-
-This runs:
-- Convex backend (`convex dev`)
-- Vite frontend dev server
-- Component build watcher
 
 ### 5. Explore the Demo
 
