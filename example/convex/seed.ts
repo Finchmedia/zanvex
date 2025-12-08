@@ -146,6 +146,7 @@ export const seedDemoData = mutation({
       acme: v.array(v.id("users")),
       betaco: v.array(v.id("users"))
     }),
+    customers: v.array(v.id("users")),
     orgs: v.object({
       acme: v.id("orgs"),
       betaco: v.id("orgs")
@@ -154,17 +155,15 @@ export const seedDemoData = mutation({
       acme: v.array(v.id("resources")),
       betaco: v.array(v.id("resources"))
     }),
-    bookings: v.object({
-      acme: v.array(v.id("bookings")),
-      betaco: v.array(v.id("bookings"))
-    }),
+    bookings: v.array(v.id("bookings")),
     tuples: v.number(),
   }),
   handler: async (ctx): Promise<{
     users: { acme: Id<"users">[]; betaco: Id<"users">[] };
+    customers: Id<"users">[];
     orgs: { acme: Id<"orgs">; betaco: Id<"orgs"> };
     resources: { acme: Id<"resources">[]; betaco: Id<"resources">[] };
-    bookings: { acme: Id<"bookings">[]; betaco: Id<"bookings">[] };
+    bookings: Id<"bookings">[];
     tuples: number;
   }> => {
     console.log("🎭 Starting demo data seed...\n");
@@ -461,6 +460,7 @@ export const seedAll = mutation({
         acme: v.array(v.id("users")),
         betaco: v.array(v.id("users"))
       }),
+      customers: v.array(v.id("users")),
       orgs: v.object({
         acme: v.id("orgs"),
         betaco: v.id("orgs")
@@ -469,10 +469,7 @@ export const seedAll = mutation({
         acme: v.array(v.id("resources")),
         betaco: v.array(v.id("resources"))
       }),
-      bookings: v.object({
-        acme: v.array(v.id("bookings")),
-        betaco: v.array(v.id("bookings"))
-      }),
+      bookings: v.array(v.id("bookings")),
       tuples: v.number(),
     })),
   }),
@@ -481,9 +478,10 @@ export const seedAll = mutation({
     relations: { total: number };
     demoData?: {
       users: { acme: Id<"users">[]; betaco: Id<"users">[] };
+      customers: Id<"users">[];
       orgs: { acme: Id<"orgs">; betaco: Id<"orgs"> };
       resources: { acme: Id<"resources">[]; betaco: Id<"resources">[] };
-      bookings: { acme: Id<"bookings">[]; betaco: Id<"bookings">[] };
+      bookings: Id<"bookings">[];
       tuples: number;
     };
   }> => {
