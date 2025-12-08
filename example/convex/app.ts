@@ -469,16 +469,6 @@ export const clearAllData = mutation({
 });
 
 /**
- * List all tuples (for clearing component data)
- */
-export const listAllTuples = query({
-  args: {},
-  handler: async (ctx) => {
-    return await zanvex.listAllTuples(ctx);
-  },
-});
-
-/**
  * Get booking permissions for a user
  */
 export const getBookingPermissions = query({

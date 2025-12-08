@@ -547,20 +547,11 @@ export const seedFresh = mutation({
     const appClearResult = await ctx.runMutation(api.app.clearAllData, {});
     console.log(`  Cleared ${appClearResult.deletedUsers + appClearResult.deletedOrgs + appClearResult.deletedResources + appClearResult.deletedBookings + appClearResult.deletedOrgMembers} app records\n`);
 
-    // Clear component tables by deleting all tuples
+    // Clear component tuples using Zanvex's clearAll method
     // This effectively resets the component's authorization state
     console.log("Clearing component tuples...");
-    const allTuples = await ctx.runQuery(api.app.listAllTuples, {});
-    for (const tuple of allTuples) {
-      await zanvex.deleteTuple(ctx, {
-        objectType: tuple.objectType,
-        objectId: tuple.objectId,
-        relation: tuple.relation,
-        subjectType: tuple.subjectType,
-        subjectId: tuple.subjectId,
-      });
-    }
-    console.log(`  Deleted ${allTuples.length} tuples`);
+    const deletedTuples = await zanvex.clearAll(ctx);
+    console.log(`  Deleted ${deletedTuples} tuples`);
 
     console.log("\n✅ All data cleared\n");
     console.log("🌱 Re-seeding everything from scratch...\n");
