@@ -554,7 +554,7 @@ export const seedFresh = mutation({
     console.log("🌱 Re-seeding everything from scratch...\n");
 
     // Re-seed everything
-    const result: any = await ctx.runMutation(internal.seed.seedAll, {
+    const result: any = await ctx.runMutation(api.seed.seedAll, {
       includeDemoData
     });
 
