@@ -39,7 +39,7 @@
  */
 
 import { mutation } from "./_generated/server.js";
-import { api } from "./_generated/api.js";
+import { api, internal } from "./_generated/api.js";
 import { createZanvexClient } from "@mrfinch/zanvex";
 import { components } from "./_generated/api.js";
 import { v } from "convex/values";
