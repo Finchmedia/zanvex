@@ -1,88 +1,97 @@
-# Convex Component Template
+# Zanvex
 
-This is a Convex component, ready to be published on npm.
+[![npm version](https://badge.fury.io/js/@mrfinch%2Fzanvex.svg)](https://badge.fury.io/js/@mrfinch%2Fzanvex)
 
-To create your own component:
+A Google Zanzibar-inspired authorization system for Convex. Implements Relationship-Based Access Control (ReBAC) with tuple-based permissions and graph traversal.
 
-1. Write code in src/component for your component. Component-specific tables,
-   queries, mutations, and actions go here.
-1. Write code in src/client for the Class that interfaces with the component.
-   This is the bridge your users will access to get information into and out of
-   your component
-1. Write example usage in example/convex/example.ts.
-1. Delete the text in this readme until `---` and flesh out the README.
-1. Publish to npm with `npm run alpha` or `npm run release`.
+**Features:**
+- Relationship-based permissions (inspired by Google Zanzibar)
+- Flexible permission rules with DSL (e.g., `"owner->admin_of | owner->member_of"`)
+- Graph traversal for indirect permissions
+- Built-in permission catalogs (permissions, relations, object types)
+- Interactive demo with permission tester and visualization
 
-To develop your component run a dev process in the example project:
-
-```sh
-npm i
-npm run dev
-```
-
-`npm i` will do the install and an initial build. `npm run dev` will start a
-file watcher to re-build the component, as well as the example project frontend
-and backend, which does codegen and installs the component.
-
-Modify the schema and index files in src/component/ to define your component.
-
-Write a client for using this component in src/client/index.ts.
-
-If you won't be adding frontend code (e.g. React components) to this component
-you can delete "./react" references in package.json and "src/react/" directory.
-If you will be adding frontend code, add a peer dependency on React in
-package.json.
-
-### Component Directory structure
-
-```
-.
-├── README.md           documentation of your component
-├── package.json        component name, version number, other metadata
-├── package-lock.json   Components are like libraries, package-lock.json
-│                       is .gitignored and ignored by consumers.
-├── src
-│   ├── component/
-│   │   ├── _generated/ Files here are generated for the component.
-│   │   ├── convex.config.ts  Name your component here and use other components
-│   │   ├── lib.ts    Define functions here and in new files in this directory
-│   │   └── schema.ts   schema specific to this component
-│   ├── client/
-│   │   └── index.ts    Code that needs to run in the app that uses the
-│   │                   component. Generally the app interacts directly with
-│   │                   the component's exposed API (src/component/*).
-│   └── react/          Code intended to be used on the frontend goes here.
-│       │               Your are free to delete this if this component
-│       │               does not provide code.
-│       └── index.ts
-├── example/            example Convex app that uses this component
-│   └── convex/
-│       ├── _generated/       Files here are generated for the example app.
-│       ├── convex.config.ts  Imports and uses this component
-│       ├── myFunctions.ts    Functions that use the component
-│       └── schema.ts         Example app schema
-└── dist/               Publishing artifacts will be created here.
-```
+Found a bug or have a feature request? [File it here](https://github.com/finchmedia/zanvex/issues).
 
 ---
 
-# Convex Zanvex
+## Quick Start (Development)
 
-[![npm version](https://badge.fury.io/js/@example%2Fzanvex.svg)](https://badge.fury.io/js/@example%2Fzanvex)
+Try the example app with interactive permission testing:
 
-<!-- START: Include on https://convex.dev/components -->
+### 1. Clone and Install
 
-- [ ] What is some compelling syntax as a hook?
-- [ ] Why should you use this component?
-- [ ] Links to docs / other resources?
+```bash
+git clone https://github.com/finchmedia/zanvex.git
+cd zanvex
+npm install
+```
 
-Found a bug? Feature request?
-[File it here](https://github.com/finchmedia/zanvex/issues).
+### 2. Set Up Convex
 
-## Installation
+On first run, you'll need to create a Convex project:
 
-Create a `convex.config.ts` file in your app's `convex/` folder and install the
-component by calling `use`:
+```bash
+npx convex dev
+# Follow prompts to:
+# - Log in or create a Convex account
+# - Create or link a project
+# This creates .env.local with your deployment URL
+```
+
+### 3. Seed Demo Data
+
+Populate the database with demo organizations, users, resources, and bookings:
+
+```bash
+npx convex run seed:seedFresh
+```
+
+This creates:
+- 2 organizations (ACME Studio, BetaCo Studio)
+- 4 org members (Alice, Bob, Charlie, Diana)
+- 4 external customers (CustomerA-D)
+- 4 resources (Studio A, B, X, Y)
+- 4 bookings (1 per resource)
+- 11 permission rules (org, resource, booking CRUD)
+
+### 4. Start Development Servers
+
+```bash
+npm run dev
+```
+
+This runs:
+- Convex backend (`convex dev`)
+- Vite frontend dev server
+- Component build watcher
+
+### 5. Explore the Demo
+
+Open [http://localhost:5173](http://localhost:5173)
+
+**Demo Features:**
+- **App Data:** View organizations, users, resources, bookings
+- **Permission Tester:** Test permissions with interactive UI
+  - Select user, action, and object
+  - See ALLOWED/DENIED results
+  - Visualize permission check paths with React Flow graph
+- **Permission Rules:** View and manage CRUD rules
+- **Catalogs:** Manage permissions, relations, and object types
+
+---
+
+## Installation (Production Use)
+
+Install the component in your Convex app:
+
+```bash
+npm install @mrfinch/zanvex
+```
+
+### Configure Your App
+
+Create or update `convex/convex.config.ts`:
 
 ```ts
 // convex/convex.config.ts
@@ -95,52 +104,277 @@ app.use(zanvex);
 export default app;
 ```
 
+---
+
 ## Usage
 
-```ts
-import { components } from "./_generated/api";
+### Initialize Component
 
-export const addComment = mutation({
-  args: { text: v.string(), targetId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.runMutation(components.zanvex.lib.add, {
-      text: args.text,
-      targetId: args.targetId,
-      userId: await getAuthUserId(ctx),
+Create permission catalogs and rules on first run:
+
+```ts
+// convex/seed.ts
+import { components } from "./_generated/api";
+import { api } from "./_generated/api";
+
+export const initializeZanvex = mutation({
+  handler: async (ctx) => {
+    // Initialize default permissions (create, read, update, delete)
+    await ctx.runMutation(components.zanvex.permissionCatalog.initializePermissions);
+
+    // Define custom relations
+    await ctx.runMutation(components.zanvex.relationCatalog.registerRelation, {
+      name: "admin_of",
+      label: "Admin of"
     });
-  },
+
+    // Define object types
+    await ctx.runMutation(components.zanvex.objectTypes.register, {
+      name: "org",
+      label: "Organization"
+    });
+
+    // Define permission rules
+    await ctx.runMutation(components.zanvex.permissionRules.define, {
+      objectType: "org",
+      permission: "update",
+      rule: "admin_of"
+    });
+  }
 });
 ```
 
-See more example usage in [example.ts](./example/convex/example.ts).
-
-### HTTP Routes
-
-You can register HTTP routes for the component to expose HTTP endpoints:
+### Create Tuples (Assign Permissions)
 
 ```ts
-import { httpRouter } from "convex/server";
-import { registerRoutes } from "@mrfinch/zanvex";
 import { components } from "./_generated/api";
 
-const http = httpRouter();
-
-registerRoutes(http, components.zanvex, {
-  pathPrefix: "/comments",
+// Make Alice an admin of ACME org
+export const makeUserOrgAdmin = mutation({
+  args: { userId: v.id("users"), orgId: v.id("orgs") },
+  handler: async (ctx, { userId, orgId }) => {
+    await ctx.runMutation(components.zanvex.lib.createTuple, {
+      object: { type: "org", id: orgId },
+      relation: "admin_of",
+      subject: { type: "user", id: userId }
+    });
+  }
 });
-
-export default http;
 ```
 
-This will expose a GET endpoint that returns the most recent comment as JSON.
-The endpoint requires a `targetId` query parameter. See
-[http.ts](./example/convex/http.ts) for a complete example.
+### Check Permissions
 
-<!-- END: Include on https://convex.dev/components -->
+```ts
+import { components } from "./_generated/api";
 
-Run the example:
+// Check if user can update org
+export const canUserUpdateOrg = query({
+  args: { userId: v.id("users"), orgId: v.id("orgs") },
+  handler: async (ctx, { userId, orgId }) => {
+    const result = await ctx.runQuery(components.zanvex.lib.can, {
+      subject: { type: "user", id: userId },
+      action: "update",
+      object: { type: "org", id: orgId }
+    });
 
-```sh
-npm i
-npm run dev
+    return result.allowed;
+  }
+});
 ```
+
+### Example: Dual-Write Pattern
+
+Maintain app tables and Zanvex tuples together:
+
+```ts
+// Create org and assign admin in one mutation
+export const createOrg = mutation({
+  args: { name: v.string(), adminUserId: v.id("users") },
+  handler: async (ctx, { name, adminUserId }) => {
+    // 1. Create org in app table
+    const orgId = await ctx.db.insert("orgs", { name });
+
+    // 2. Create Zanvex tuple (admin relation)
+    await ctx.runMutation(components.zanvex.lib.createTuple, {
+      object: { type: "org", id: orgId },
+      relation: "admin_of",
+      subject: { type: "user", id: adminUserId }
+    });
+
+    return orgId;
+  }
+});
+```
+
+---
+
+## Permission Rules DSL
+
+Zanvex supports Zanzibar-style permission expressions:
+
+### Direct Relations
+```ts
+"admin_of"           // User has direct admin_of relation to object
+"member_of"          // User has direct member_of relation to object
+```
+
+### Computed Relations (Traversal)
+```ts
+"owner->admin_of"    // User is admin of the owner of this object
+"parent->update"     // User can update the parent of this object
+```
+
+### Union (OR)
+```ts
+"admin_of | member_of"                    // User is admin OR member
+"owner->admin_of | owner->member_of"      // User is admin OR member of owner
+```
+
+### Example Rules
+```ts
+// Org permissions
+org.read = "admin_of | member_of"         // Admins and members can read
+org.update = "admin_of"                   // Only admins can update
+
+// Resource permissions (owned by orgs)
+resource.create = "owner->admin_of"       // Admin of owner org can create
+resource.update = "owner->admin_of | owner->member_of"  // Admin or member
+
+// Booking permissions (parent is resource)
+booking.read = "booker"                   // Booker can read their booking
+booking.update = "booker | parent->owner->admin_of"  // Booker OR org admin
+```
+
+---
+
+## Architecture
+
+### Component Structure
+
+```
+src/
+├── component/          # Convex component (backend)
+│   ├── lib.ts         # Main API: createTuple, deleteTuple, can
+│   ├── schema.ts      # Tuple storage schema
+│   ├── permissionCatalog.ts
+│   ├── relationCatalog.ts
+│   ├── objectTypes.ts
+│   └── permissionRules.ts
+├── client/
+│   └── index.ts       # Client-side API wrapper
+└── react/
+    └── index.ts       # React hooks (future)
+
+example/
+├── convex/
+│   ├── app.ts         # Example app functions
+│   └── seed.ts        # Demo data seeding
+└── src/
+    └── pages/
+        └── permission-tester.tsx  # Interactive UI
+```
+
+### Key Concepts
+
+**Tuples:** Subject-Relation-Object triples
+```ts
+{
+  object: { type: "org", id: "123" },
+  relation: "admin_of",
+  subject: { type: "user", id: "456" }
+}
+```
+
+**Permission Rules:** Define how permissions are computed
+```ts
+{
+  objectType: "resource",
+  permission: "update",
+  rule: "owner->admin_of | owner->member_of"
+}
+```
+
+**Graph Traversal:** Permission checks walk the relationship graph to find valid paths from subject to object.
+
+---
+
+## Development
+
+### Run Tests
+```bash
+npm test
+```
+
+### Type Check
+```bash
+npm run typecheck
+```
+
+### Lint
+```bash
+npm run lint
+```
+
+### Build Component
+```bash
+npm run build
+```
+
+### Publish
+```bash
+npm run alpha    # Alpha release
+npm run release  # Production release
+```
+
+---
+
+## Component Directory Structure
+
+```
+.
+├── README.md           # This file
+├── package.json        # Component metadata
+├── src/
+│   ├── component/      # Convex component backend
+│   ├── client/         # Client SDK
+│   └── react/          # React hooks/components
+├── example/            # Example app
+│   ├── convex/         # Backend functions
+│   └── src/            # Frontend (Vite + React)
+└── dist/               # Build artifacts (gitignored)
+```
+
+---
+
+## Seed Script Reference
+
+The example app includes a comprehensive seed script:
+
+```bash
+# Nuclear option: Clear ALL data and re-seed
+npx convex run seed:seedFresh
+
+# Seed without clearing (incremental)
+npx convex run seed:seedAll
+
+# Individual seeding functions
+npx convex run seed:seedPermissions
+npx convex run seed:seedRelations
+npx convex run seed:seedObjectTypes
+npx convex run seed:seedPermissionRules
+npx convex run seed:seedDemoData
+```
+
+See `example/convex/seed.ts` for full documentation.
+
+---
+
+## License
+
+Apache-2.0
+
+---
+
+## Contributing
+
+Contributions are welcome! Please open an issue or PR on [GitHub](https://github.com/finchmedia/zanvex).
