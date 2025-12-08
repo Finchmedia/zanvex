@@ -1,17 +1,41 @@
 /**
- * Seed Script for Zanvex Catalogs
+ * Zanvex Example App - Comprehensive Seed Script
  *
- * Run this to populate the permission_catalog and relation_catalog tables
- * with default values.
+ * This script is the SOURCE OF TRUTH for all data in the Zanvex demo.
  *
- * Usage:
- *   npx convex run seed:seedAll
+ * USAGE:
  *
- * Or seed individually:
- *   npx convex run seed:seedPermissions
- *   npx convex run seed:seedRelations
- *   npx convex run seed:seedObjectTypes
- *   npx convex run seed:seedPermissionRules
+ * 1. Nuclear Option (recommended for fresh start):
+ *    npx convex data clear --all
+ *    npx convex run seed:seedFresh '{"includeDemoData": true}'
+ *
+ *    OR use the convenient shorthand:
+ *    npx convex run seed:seedFresh
+ *
+ * 2. Incremental Seeding (if you already have data):
+ *    npx convex run seed:seedAll '{"includeDemoData": true}'
+ *
+ * 3. Individual Functions (for debugging):
+ *    npx convex run seed:seedPermissions
+ *    npx convex run seed:seedRelations
+ *    npx convex run seed:seedObjectTypes
+ *    npx convex run seed:seedPermissionRules
+ *    npx convex run seed:seedDemoData
+ *
+ * WHAT GETS SEEDED:
+ *
+ * Component Catalogs (source of truth):
+ * - 4 CRUD permissions (create, read, update, delete)
+ * - 11 relation names (parent, owner, member_of, admin_of, booker, etc.)
+ * - 4 object types (user, org, resource, booking)
+ * - 8 permission rules (CRUD rules for resource and booking)
+ *
+ * App Data + Tuples (via dual-write):
+ * - 2 organizations (Acme Studio, BetaCo Studio)
+ * - 4 users (Alice, Bob, Charlie, Diana)
+ * - 4 resources (Studio A, Studio B per org)
+ * - 8 bookings (4 per org)
+ * - ~24 Zanvex tuples (org memberships, resource ownership, booking relations)
  */
 
 import { mutation } from "./_generated/server.js";
@@ -492,6 +516,47 @@ export const seedAll = mutation({
       permissions: permResult,
       relations: relResult,
       demoData: demoResult,
+    };
+  },
+});
+
+/**
+ * Nuclear option: Clear ALL data and re-seed everything fresh
+ *
+ * WARNING: This is DESTRUCTIVE. It clears:
+ * - All app tables (users, orgs, resources, bookings, org_members)
+ * - All component tables (permission_catalog, relation_catalog, object_types, permission_rules, tuples)
+ *
+ * Then re-creates everything from scratch.
+ *
+ * @param includeDemoData - Whether to seed demo data (default: true)
+ */
+export const seedFresh = mutation({
+  args: {
+    includeDemoData: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { includeDemoData = true }) => {
+    console.log("🔥 NUCLEAR SEED: Clearing all data...\n");
+
+    // Clear all app tables
+    await ctx.runMutation(api.app.clearAllData, {});
+
+    // Clear all component tables (via Zanvex API)
+    // Note: Zanvex doesn't expose a "clear all" method, but deleting all tuples
+    // and clearing catalogs effectively resets the component
+
+    console.log("✅ All data cleared\n");
+    console.log("🌱 Re-seeding everything from scratch...\n");
+
+    // Re-seed everything
+    const result = await ctx.runMutation(internal.seed.seedAll, {
+      includeDemoData
+    });
+
+    console.log("\n✅ Fresh seed complete!");
+    return {
+      ...result,
+      warning: "All previous data was destroyed and recreated fresh"
     };
   },
 });

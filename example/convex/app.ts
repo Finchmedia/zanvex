@@ -412,6 +412,63 @@ export const deleteBooking = mutation({
 });
 
 /**
+ * Clear all app data (for fresh seeding)
+ * WARNING: DESTRUCTIVE - deletes all users, orgs, resources, bookings
+ */
+export const clearAllData = mutation({
+  args: {},
+  handler: async (ctx) => {
+    console.log("Clearing app data...");
+
+    // Delete all bookings
+    const bookings = await ctx.db.query("bookings").collect();
+    for (const booking of bookings) {
+      await ctx.db.delete(booking._id);
+    }
+    console.log(`  Deleted ${bookings.length} bookings`);
+
+    // Delete all resources
+    const resources = await ctx.db.query("resources").collect();
+    for (const resource of resources) {
+      await ctx.db.delete(resource._id);
+    }
+    console.log(`  Deleted ${resources.length} resources`);
+
+    // Delete all org members
+    const members = await ctx.db.query("org_members").collect();
+    for (const member of members) {
+      await ctx.db.delete(member._id);
+    }
+    console.log(`  Deleted ${members.length} org members`);
+
+    // Delete all orgs
+    const orgs = await ctx.db.query("orgs").collect();
+    for (const org of orgs) {
+      await ctx.db.delete(org._id);
+    }
+    console.log(`  Deleted ${orgs.length} orgs`);
+
+    // Delete all users
+    const users = await ctx.db.query("users").collect();
+    for (const user of users) {
+      await ctx.db.delete(user._id);
+    }
+    console.log(`  Deleted ${users.length} users`);
+
+    // Note: Component tables (tuples, catalogs) are cleared by Convex's data clear command
+    // or by the component's internal reset functions
+
+    return {
+      deletedUsers: users.length,
+      deletedOrgs: orgs.length,
+      deletedOrgMembers: members.length,
+      deletedResources: resources.length,
+      deletedBookings: bookings.length,
+    };
+  },
+});
+
+/**
  * Get booking permissions for a user
  */
 export const getBookingPermissions = query({
