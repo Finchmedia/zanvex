@@ -671,6 +671,9 @@ export const getAllTuples = query({
  * Initialize permission rules for the example app
  *
  * Sets up Zanzibar-style CRUD rules:
+ *   org.read = "admin_of | member_of"
+ *   org.update = "admin_of"
+ *   org.delete = "admin_of"
  *   resource.create = "owner->admin_of"
  *   resource.read = "owner->admin_of | owner->member_of"
  *   resource.update = "owner->admin_of | owner->member_of"
@@ -683,6 +686,26 @@ export const getAllTuples = query({
 export const initializePermissionRules = mutation({
   args: {},
   handler: async (ctx) => {
+    // Org permissions - direct member/admin relations
+    await zanvex.definePermission(
+      ctx,
+      "org",
+      "read",
+      "admin_of | member_of"
+    );
+    await zanvex.definePermission(
+      ctx,
+      "org",
+      "update",
+      "admin_of"
+    );
+    await zanvex.definePermission(
+      ctx,
+      "org",
+      "delete",
+      "admin_of"
+    );
+
     // Resource permissions - check owner org's relations
     await zanvex.definePermission(
       ctx,

@@ -28,14 +28,15 @@
  * - 4 CRUD permissions (create, read, update, delete)
  * - 11 relation names (parent, owner, member_of, admin_of, booker, etc.)
  * - 4 object types (user, org, resource, booking)
- * - 8 permission rules (CRUD rules for resource and booking)
+ * - 11 permission rules (3 org + 4 resource + 4 booking)
  *
  * App Data + Tuples (via dual-write):
  * - 2 organizations (Acme Studio, BetaCo Studio)
- * - 4 users (Alice, Bob, Charlie, Diana)
- * - 4 resources (Studio A, Studio B per org)
- * - 8 bookings (4 per org)
- * - ~24 Zanvex tuples (org memberships, resource ownership, booking relations)
+ * - 4 org members (Alice admin, Bob member at Acme | Charlie admin, Diana member at BetaCo)
+ * - 4 external customers (CustomerA, B, C, D - not in any org)
+ * - 4 resources (Studio A, B at Acme | Studio X, Y at BetaCo)
+ * - 4 bookings (1 per resource, each by different customer)
+ * - 16 Zanvex tuples (4 org memberships + 4 resource ownerships + 8 booking relations)
  */
 
 import { mutation } from "./_generated/server.js";
@@ -268,40 +269,43 @@ export const seedDemoData = mutation({
     console.log("   ✓ Acme: Studio A, Studio B");
     console.log("   ✓ BetaCo: Studio X, Studio Y");
 
-    // 5. Create Bookings
+    // 5. Create External Customers (not in any org)
+    console.log("\n👤 Creating external customers...");
+    const customerAId: Id<"users"> = await getOrCreateUser("CustomerA", "customer.a@example.com");
+    const customerBId: Id<"users"> = await getOrCreateUser("CustomerB", "customer.b@example.com");
+    const customerCId: Id<"users"> = await getOrCreateUser("CustomerC", "customer.c@example.com");
+    const customerDId: Id<"users"> = await getOrCreateUser("CustomerD", "customer.d@example.com");
+    console.log("   ✓ CustomerA, CustomerB, CustomerC, CustomerD (not in any org)");
+
+    // 6. Create Bookings (1 per resource, each by different customer)
     console.log("\n📅 Creating bookings...");
-    const acmeBookings: Id<"bookings">[] = [
-      await getOrCreateBooking("Morning Session", studioAId, aliceId, addDays(2, 9, 0)),
-      await getOrCreateBooking("Afternoon Session", studioAId, bobId, addDays(3, 14, 0)),
-      await getOrCreateBooking("Evening Session", studioBId, aliceId, addDays(5, 18, 0)),
-      await getOrCreateBooking("Night Session", studioBId, bobId, addDays(7, 20, 0)),
-    ];
-    const betacoBookings: Id<"bookings">[] = [
-      await getOrCreateBooking("Weekend Session", studioXId, charlieId, addDays(10, 11, 0)),
-      await getOrCreateBooking("Weekday Session", studioXId, dianaId, addDays(12, 15, 0)),
-      await getOrCreateBooking("Premium Session", studioYId, charlieId, addDays(15, 10, 0)),
-      await getOrCreateBooking("Standard Session", studioYId, dianaId, addDays(18, 13, 0)),
-    ];
-    console.log("   ✓ Acme: 4 bookings (Studio A: 2, Studio B: 2)");
-    console.log("   ✓ BetaCo: 4 bookings (Studio X: 2, Studio Y: 2)");
+    const bookingA: Id<"bookings"> = await getOrCreateBooking("Morning Session", studioAId, customerAId, addDays(2, 9, 0));
+    const bookingB: Id<"bookings"> = await getOrCreateBooking("Afternoon Session", studioBId, customerBId, addDays(3, 14, 0));
+    const bookingC: Id<"bookings"> = await getOrCreateBooking("Evening Session", studioXId, customerCId, addDays(5, 18, 0));
+    const bookingD: Id<"bookings"> = await getOrCreateBooking("Weekend Session", studioYId, customerDId, addDays(7, 11, 0));
+    console.log("   ✓ Studio A: Morning Session (CustomerA)");
+    console.log("   ✓ Studio B: Afternoon Session (CustomerB)");
+    console.log("   ✓ Studio X: Evening Session (CustomerC)");
+    console.log("   ✓ Studio Y: Weekend Session (CustomerD)");
 
-    // 6. Update booking statuses (first 6 confirmed, last 2 pending)
+    // 7. Update booking statuses (3 confirmed, 1 pending)
     console.log("\n✏️  Updating booking statuses...");
-    const allBookings = [...acmeBookings, ...betacoBookings];
-    for (let i = 0; i < 6; i++) {
-      await ctx.db.patch(allBookings[i], { status: "confirmed" });
-    }
-    console.log("   ✓ 6 bookings confirmed, 2 pending");
+    await ctx.db.patch(bookingA, { status: "confirmed" });
+    await ctx.db.patch(bookingB, { status: "confirmed" });
+    await ctx.db.patch(bookingC, { status: "confirmed" });
+    // bookingD stays pending
+    console.log("   ✓ 3 bookings confirmed, 1 pending");
 
-    // 7. Calculate total tuples created
-    // 4 org memberships + 4 resource ownerships + 16 booking relations (8 × 2: parent + booker)
-    const totalTuples = 4 + 4 + 16;
+    // 8. Calculate total tuples created
+    // 4 org memberships + 4 resource ownerships + 8 booking relations (4 × 2: parent + booker)
+    const totalTuples = 4 + 4 + 8;
 
     console.log("\n✅ Demo data seed complete!");
-    console.log(`   - Users: 4 (2 per org)`);
+    console.log(`   - Org Members: 4 (Alice, Bob, Charlie, Diana)`);
+    console.log(`   - External Customers: 4 (CustomerA, B, C, D)`);
     console.log(`   - Organizations: 2`);
     console.log(`   - Resources: 4 (2 per org)`);
-    console.log(`   - Bookings: 8 (6 confirmed, 2 pending)`);
+    console.log(`   - Bookings: 4 (3 confirmed, 1 pending)`);
     console.log(`   - Zanvex tuples: ${totalTuples} (auto-created via dual-write)\n`);
 
     return {
@@ -309,6 +313,7 @@ export const seedDemoData = mutation({
         acme: [aliceId, bobId],
         betaco: [charlieId, dianaId]
       },
+      customers: [customerAId, customerBId, customerCId, customerDId],
       orgs: {
         acme: acmeId,
         betaco: betacoId
@@ -317,10 +322,7 @@ export const seedDemoData = mutation({
         acme: [studioAId, studioBId],
         betaco: [studioXId, studioYId]
       },
-      bookings: {
-        acme: acmeBookings,
-        betaco: betacoBookings
-      },
+      bookings: [bookingA, bookingB, bookingC, bookingD],
       tuples: totalTuples
     };
   },
