@@ -80,9 +80,9 @@ export function PermissionTesterPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <section>
-        <div className="flex items-center gap-2 mb-4">
+    <div>
+      <section className="space-y-6">
+        <div className="flex items-center gap-2">
           <Shield className="size-5" />
           <h2 className="text-xl font-semibold">Permission Tester</h2>
         </div>
