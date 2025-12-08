@@ -87,130 +87,138 @@ export function PermissionTesterPage() {
           <h2 className="text-xl font-semibold">Permission Tester</h2>
         </div>
 
-        {/* Step 1: Select User */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Step 1: Select User</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {users.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No users available</p>
-              ) : (
-                users.map((u) => (
-                  <Button
-                    key={u._id}
-                    variant={userId === u._id ? "default" : "outline"}
-                    onClick={() => setUserId(u._id)}
-                  >
-                    {u.name}
-                  </Button>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* 3-Column Selection Grid */}
+        <div className="grid grid-cols-3 gap-4">
+          {/* Column 1: Select User */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Select User</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-2">
+                {users.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No users available</p>
+                ) : (
+                  users.map((u) => (
+                    <Button
+                      key={u._id}
+                      variant={userId === u._id ? "default" : "outline"}
+                      onClick={() => setUserId(userId === u._id ? null : u._id)}
+                      className="justify-start"
+                    >
+                      {u.name}
+                    </Button>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Step 2: Select Action */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Step 2: Select Action</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {permissions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No permissions available</p>
-              ) : (
-                permissions.map((p) => (
-                  <Button
-                    key={p.name}
-                    variant={action === p.name ? "default" : "outline"}
-                    onClick={() => setAction(p.name)}
-                  >
-                    {p.label}
-                  </Button>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+          {/* Column 2: Select Action */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Select Action</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-2">
+                {permissions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No permissions available</p>
+                ) : (
+                  permissions.map((p) => (
+                    <Button
+                      key={p.name}
+                      variant={action === p.name ? "default" : "outline"}
+                      onClick={() => setAction(action === p.name ? null : p.name)}
+                      className="justify-start"
+                    >
+                      {p.label}
+                    </Button>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Step 3: Select Object */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Step 3: Select Object</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {orgs.length === 0 && resources.length === 0 && bookings.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No objects available</p>
-              ) : (
-                <>
-                  {orgs.length > 0 && (
-                    <div>
-                      <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                        Organizations ({orgs.length})
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {orgs.map((o) => (
-                          <Button
-                            key={o._id}
-                            variant={objectRef === `org:${o._id}` ? "default" : "outline"}
-                            onClick={() => setObjectRef(`org:${o._id}`)}
-                          >
-                            {o.name}
-                          </Button>
-                        ))}
+          {/* Column 3: Select Object */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Select Object</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {orgs.length === 0 && resources.length === 0 && bookings.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No objects available</p>
+                ) : (
+                  <>
+                    {orgs.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-medium text-muted-foreground mb-2">
+                          Organizations ({orgs.length})
+                        </h4>
+                        <div className="flex flex-col gap-2">
+                          {orgs.map((o) => (
+                            <Button
+                              key={o._id}
+                              variant={objectRef === `org:${o._id}` ? "default" : "outline"}
+                              onClick={() => setObjectRef(objectRef === `org:${o._id}` ? null : `org:${o._id}`)}
+                              className="justify-start"
+                            >
+                              {o.name}
+                            </Button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {resources.length > 0 && (
-                    <div>
-                      <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                        Resources ({resources.length})
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {resources.map((r) => (
-                          <Button
-                            key={r._id}
-                            variant={objectRef === `resource:${r._id}` ? "default" : "outline"}
-                            onClick={() => setObjectRef(`resource:${r._id}`)}
-                          >
-                            {r.name}
-                            <span className="ml-1 text-xs text-muted-foreground">
-                              @{orgs.find((o) => o._id === r.orgId)?.name}
-                            </span>
-                          </Button>
-                        ))}
+                    )}
+                    {resources.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-medium text-muted-foreground mb-2">
+                          Resources ({resources.length})
+                        </h4>
+                        <div className="flex flex-col gap-2">
+                          {resources.map((r) => (
+                            <Button
+                              key={r._id}
+                              variant={objectRef === `resource:${r._id}` ? "default" : "outline"}
+                              onClick={() => setObjectRef(objectRef === `resource:${r._id}` ? null : `resource:${r._id}`)}
+                              className="justify-start"
+                            >
+                              <span>{r.name}</span>
+                              <span className="ml-1 text-xs opacity-70">
+                                @{orgs.find((o) => o._id === r.orgId)?.name}
+                              </span>
+                            </Button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {bookings.length > 0 && (
-                    <div>
-                      <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                        Bookings ({bookings.length})
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {bookings.map((b) => (
-                          <Button
-                            key={b._id}
-                            variant={objectRef === `booking:${b._id}` ? "default" : "outline"}
-                            onClick={() => setObjectRef(`booking:${b._id}`)}
-                          >
-                            {b.title}
-                            <span className="ml-1 text-xs text-muted-foreground">
-                              @{resources.find((r) => r._id === b.resourceId)?.name}
-                            </span>
-                          </Button>
-                        ))}
+                    )}
+                    {bookings.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-medium text-muted-foreground mb-2">
+                          Bookings ({bookings.length})
+                        </h4>
+                        <div className="flex flex-col gap-2">
+                          {bookings.map((b) => (
+                            <Button
+                              key={b._id}
+                              variant={objectRef === `booking:${b._id}` ? "default" : "outline"}
+                              onClick={() => setObjectRef(objectRef === `booking:${b._id}` ? null : `booking:${b._id}`)}
+                              className="justify-start"
+                            >
+                              <span>{b.title}</span>
+                              <span className="ml-1 text-xs opacity-70">
+                                @{resources.find((r) => r._id === b.resourceId)?.name}
+                              </span>
+                            </Button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                    )}
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Result Display */}
         {checkResult && (
