@@ -8,15 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, Shield } from "lucide-react";
 import { TraversalGraph } from "@/components/traversal-graph";
 import { cn } from "@/lib/utils";
@@ -88,133 +80,134 @@ export function PermissionTesterPage() {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <section>
         <div className="flex items-center gap-2 mb-4">
           <Shield className="size-5" />
           <h2 className="text-xl font-semibold">Permission Tester</h2>
-          <span className="text-muted-foreground text-sm">
-            (Interactive permission checker with graph visualization)
-          </span>
         </div>
 
-        {/* Input Section */}
+        {/* Step 1: Select User */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Test Permission</CardTitle>
-            <CardDescription>
-              Select a user, action, and object to check permissions
-            </CardDescription>
+            <CardTitle className="text-base">Step 1: Select User</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              {/* User Dropdown */}
-              <div>
-                <label className="text-xs font-medium mb-2 block">User</label>
-                <Select
-                  value={userId ?? undefined}
-                  onValueChange={(val) => setUserId(val as Id<"users">)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select user..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.length === 0 ? (
-                      <SelectItem value="none" disabled>
-                        No users available
-                      </SelectItem>
-                    ) : (
-                      users.map((u) => (
-                        <SelectItem key={u._id} value={u._id}>
-                          {u.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="flex flex-wrap gap-2">
+              {users.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No users available</p>
+              ) : (
+                users.map((u) => (
+                  <Button
+                    key={u._id}
+                    variant={userId === u._id ? "default" : "outline"}
+                    onClick={() => setUserId(u._id)}
+                  >
+                    {u.name}
+                  </Button>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-              {/* Action Dropdown */}
-              <div>
-                <label className="text-xs font-medium mb-2 block">Action</label>
-                <Select value={action ?? undefined} onValueChange={setAction}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select action..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {permissions.length === 0 ? (
-                      <SelectItem value="none" disabled>
-                        No permissions available
-                      </SelectItem>
-                    ) : (
-                      permissions.map((p) => (
-                        <SelectItem key={p.name} value={p.name}>
-                          {p.label}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* Step 2: Select Action */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Step 2: Select Action</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {permissions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No permissions available</p>
+              ) : (
+                permissions.map((p) => (
+                  <Button
+                    key={p.name}
+                    variant={action === p.name ? "default" : "outline"}
+                    onClick={() => setAction(p.name)}
+                  >
+                    {p.label}
+                  </Button>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-              {/* Object Dropdown */}
-              <div>
-                <label className="text-xs font-medium mb-2 block">Object</label>
-                <Select value={objectRef ?? undefined} onValueChange={setObjectRef}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select object..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {orgs.length === 0 && resources.length === 0 && bookings.length === 0 ? (
-                      <SelectItem value="none" disabled>
-                        No objects available
-                      </SelectItem>
-                    ) : (
-                      <>
-                        {orgs.length > 0 && (
-                          <SelectGroup>
-                            <SelectLabel>Organizations</SelectLabel>
-                            {orgs.map((o) => (
-                              <SelectItem
-                                key={o._id}
-                                value={`org:${o._id}`}
-                              >
-                                {o.name}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        )}
-                        {resources.length > 0 && (
-                          <SelectGroup>
-                            <SelectLabel>Resources</SelectLabel>
-                            {resources.map((r) => (
-                              <SelectItem
-                                key={r._id}
-                                value={`resource:${r._id}`}
-                              >
-                                {r.name}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        )}
-                        {bookings.length > 0 && (
-                          <SelectGroup>
-                            <SelectLabel>Bookings</SelectLabel>
-                            {bookings.map((b) => (
-                              <SelectItem
-                                key={b._id}
-                                value={`booking:${b._id}`}
-                              >
-                                {b.title}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        )}
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* Step 3: Select Object */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Step 3: Select Object</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {orgs.length === 0 && resources.length === 0 && bookings.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No objects available</p>
+              ) : (
+                <>
+                  {orgs.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-medium text-muted-foreground mb-2">
+                        Organizations ({orgs.length})
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {orgs.map((o) => (
+                          <Button
+                            key={o._id}
+                            variant={objectRef === `org:${o._id}` ? "default" : "outline"}
+                            onClick={() => setObjectRef(`org:${o._id}`)}
+                          >
+                            {o.name}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {resources.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-medium text-muted-foreground mb-2">
+                        Resources ({resources.length})
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {resources.map((r) => (
+                          <Button
+                            key={r._id}
+                            variant={objectRef === `resource:${r._id}` ? "default" : "outline"}
+                            onClick={() => setObjectRef(`resource:${r._id}`)}
+                          >
+                            {r.name}
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              @{orgs.find((o) => o._id === r.orgId)?.name}
+                            </span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {bookings.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-medium text-muted-foreground mb-2">
+                        Bookings ({bookings.length})
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {bookings.map((b) => (
+                          <Button
+                            key={b._id}
+                            variant={objectRef === `booking:${b._id}` ? "default" : "outline"}
+                            onClick={() => setObjectRef(`booking:${b._id}`)}
+                          >
+                            {b.title}
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              @{resources.find((r) => r._id === b.resourceId)?.name}
+                            </span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
