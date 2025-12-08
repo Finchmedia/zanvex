@@ -81,7 +81,7 @@ export function PermissionTesterPage() {
 
   return (
     <div>
-      <section className="space-y-6">
+      <section className="space-y-5">
         <div className="flex items-center gap-2">
           <Shield className="size-5" />
           <h2 className="text-xl font-semibold">Permission Tester</h2>
@@ -180,12 +180,14 @@ export function PermissionTesterPage() {
                               key={r._id}
                               variant={objectRef === `resource:${r._id}` ? "default" : "outline"}
                               onClick={() => setObjectRef(objectRef === `resource:${r._id}` ? null : `resource:${r._id}`)}
-                              className="justify-start"
+                              className="justify-start h-auto py-2 whitespace-normal text-left"
                             >
-                              <span>{r.name}</span>
-                              <span className="ml-1 text-xs opacity-70">
-                                @{orgs.find((o) => o._id === r.orgId)?.name}
-                              </span>
+                              <div className="flex flex-col items-start">
+                                <span>{r.name}</span>
+                                <span className="text-xs opacity-70">
+                                  @{orgs.find((o) => o._id === r.orgId)?.name}
+                                </span>
+                              </div>
                             </Button>
                           ))}
                         </div>
@@ -202,12 +204,14 @@ export function PermissionTesterPage() {
                               key={b._id}
                               variant={objectRef === `booking:${b._id}` ? "default" : "outline"}
                               onClick={() => setObjectRef(objectRef === `booking:${b._id}` ? null : `booking:${b._id}`)}
-                              className="justify-start"
+                              className="justify-start h-auto py-2 whitespace-normal text-left"
                             >
-                              <span>{b.title}</span>
-                              <span className="ml-1 text-xs opacity-70">
-                                @{resources.find((r) => r._id === b.resourceId)?.name}
-                              </span>
+                              <div className="flex flex-col items-start">
+                                <span>{b.title}</span>
+                                <span className="text-xs opacity-70">
+                                  @{resources.find((r) => r._id === b.resourceId)?.name}
+                                </span>
+                              </div>
                             </Button>
                           ))}
                         </div>
