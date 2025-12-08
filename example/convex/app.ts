@@ -683,7 +683,7 @@ export const getAllTuples = query({
  * Sets up Zanzibar-style CRUD rules:
  *   resource.create = "owner->admin_of"
  *   resource.read = "owner->admin_of | owner->member_of"
- *   resource.update = "owner->admin_of"
+ *   resource.update = "owner->admin_of | owner->member_of"
  *   resource.delete = "owner->admin_of"
  *   booking.create = "parent->update"
  *   booking.read = "parent->read | booker"
@@ -706,7 +706,7 @@ export const initializePermissionRules = mutation({
       "read",
       "owner->admin_of | owner->member_of"
     );
-    await zanvex.definePermission(ctx, "resource", "update", "owner->admin_of");
+    await zanvex.definePermission(ctx, "resource", "update", "owner->admin_of | owner->member_of");
     await zanvex.definePermission(ctx, "resource", "delete", "owner->admin_of");
 
     // Booking permissions - traverse through parent resource
