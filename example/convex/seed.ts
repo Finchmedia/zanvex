@@ -35,16 +35,6 @@ export const seedPermissions = mutation({
       { name: "read", label: "Read", description: "View/read instances", category: "crud" as const },
       { name: "update", label: "Update", description: "Modify existing instances", category: "crud" as const },
       { name: "delete", label: "Delete", description: "Remove instances", category: "crud" as const },
-
-      // Common Actions
-      { name: "view", label: "View", description: "View/access", category: "action" as const },
-      { name: "edit", label: "Edit", description: "Edit/modify", category: "action" as const },
-      { name: "cancel", label: "Cancel", description: "Cancel/revoke an action", category: "action" as const },
-      { name: "reschedule", label: "Reschedule", description: "Change timing", category: "action" as const },
-      { name: "approve", label: "Approve", description: "Grant approval", category: "action" as const },
-      { name: "reject", label: "Reject", description: "Deny/reject", category: "action" as const },
-      { name: "publish", label: "Publish", description: "Make public", category: "action" as const },
-      { name: "archive", label: "Archive", description: "Archive/deactivate", category: "action" as const },
     ];
 
     for (const perm of permissions) {

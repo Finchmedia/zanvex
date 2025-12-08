@@ -427,6 +427,22 @@ export const getBookingPermissions = query({
   },
 });
 
+/**
+ * Get org permissions for a user
+ */
+export const getOrgPermissions = query({
+  args: {
+    userId: v.id("users"),
+    orgId: v.id("orgs"),
+  },
+  handler: async (ctx, { userId, orgId }) => {
+    return await zanvex.getPermissionsForObject(ctx, {
+      subject: { type: "user", id: userId },
+      object: { type: "org", id: orgId },
+    });
+  },
+});
+
 // ============================================
 // PERMISSION CHECKS (Using Zanvex!)
 // ============================================
@@ -597,12 +613,14 @@ export const getAllTuples = query({
 /**
  * Initialize permission rules for the example app
  *
- * Sets up Zanzibar-style rules:
- *   resource.view = "owner->admin_of | owner->member_of"
- *   resource.edit = "owner->admin_of"
+ * Sets up Zanzibar-style CRUD rules:
+ *   resource.create = "owner->admin_of"
+ *   resource.read = "owner->admin_of | owner->member_of"
+ *   resource.update = "owner->admin_of"
  *   resource.delete = "owner->admin_of"
- *   booking.view = "parent->view | booker"
- *   booking.cancel = "parent->edit | booker"
+ *   booking.create = "parent->update"
+ *   booking.read = "parent->read | booker"
+ *   booking.update = "parent->update | booker"
  *   booking.delete = "parent->delete"
  */
 export const initializePermissionRules = mutation({
@@ -612,24 +630,36 @@ export const initializePermissionRules = mutation({
     await zanvex.definePermission(
       ctx,
       "resource",
-      "view",
+      "create",
+      "owner->admin_of"
+    );
+    await zanvex.definePermission(
+      ctx,
+      "resource",
+      "read",
       "owner->admin_of | owner->member_of"
     );
-    await zanvex.definePermission(ctx, "resource", "edit", "owner->admin_of");
+    await zanvex.definePermission(ctx, "resource", "update", "owner->admin_of");
     await zanvex.definePermission(ctx, "resource", "delete", "owner->admin_of");
 
     // Booking permissions - traverse through parent resource
     await zanvex.definePermission(
       ctx,
       "booking",
-      "view",
-      "parent->view | booker"
+      "create",
+      "parent->update"
     );
     await zanvex.definePermission(
       ctx,
       "booking",
-      "cancel",
-      "parent->edit | booker"
+      "read",
+      "parent->read | booker"
+    );
+    await zanvex.definePermission(
+      ctx,
+      "booking",
+      "update",
+      "parent->update | booker"
     );
     await zanvex.definePermission(ctx, "booking", "delete", "parent->delete");
   },
@@ -909,24 +939,14 @@ export const initializePermissionCatalog = mutation({
   args: {},
   handler: async (ctx) => {
     // CRUD Operations
-    const crudPermissions = [
+    const permissions = [
       { name: "create", label: "Create", description: "Create new instances", category: "crud" as const },
       { name: "read", label: "Read", description: "View/read instances", category: "crud" as const },
       { name: "update", label: "Update", description: "Modify existing instances", category: "crud" as const },
       { name: "delete", label: "Delete", description: "Remove instances", category: "crud" as const },
     ];
 
-    // Common Actions
-    const actionPermissions = [
-      { name: "cancel", label: "Cancel", description: "Cancel/revoke an action", category: "action" as const },
-      { name: "reschedule", label: "Reschedule", description: "Change timing", category: "action" as const },
-      { name: "approve", label: "Approve", description: "Grant approval", category: "action" as const },
-      { name: "reject", label: "Reject", description: "Deny/reject", category: "action" as const },
-      { name: "publish", label: "Publish", description: "Make public", category: "action" as const },
-      { name: "archive", label: "Archive", description: "Archive/deactivate", category: "action" as const },
-    ];
-
-    for (const perm of [...crudPermissions, ...actionPermissions]) {
+    for (const perm of permissions) {
       await zanvex.registerPermission(ctx, perm);
     }
   },

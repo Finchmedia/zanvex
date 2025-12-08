@@ -29,6 +29,7 @@ export function PermissionTesterPage() {
 
   // Queries - App Data
   const users = useQuery(api.app.listUsers) ?? [];
+  const orgs = useQuery(api.app.listOrgs) ?? [];
   const resources = useQuery(api.app.listResources) ?? [];
   const bookings = useQuery(api.app.listBookings) ?? [];
   const permissions = useQuery(api.app.listPermissions) ?? [];
@@ -56,7 +57,17 @@ export function PermissionTesterPage() {
   );
 
   // Query - All Permissions for Object
-  const allPermissions = useQuery(
+  const orgPermissions = useQuery(
+    api.app.getOrgPermissions,
+    userId && parsedObject && parsedObject.type === "org"
+      ? {
+          userId,
+          orgId: parsedObject.id as Id<"orgs">,
+        }
+      : "skip"
+  );
+
+  const resourcePermissions = useQuery(
     api.app.getResourcePermissions,
     userId && parsedObject && parsedObject.type === "resource"
       ? {
@@ -136,28 +147,11 @@ export function PermissionTesterPage() {
                         No permissions available
                       </SelectItem>
                     ) : (
-                      <>
-                        <SelectGroup>
-                          <SelectLabel>CRUD Operations</SelectLabel>
-                          {permissions
-                            .filter((p) => p.category === "crud")
-                            .map((p) => (
-                              <SelectItem key={p.name} value={p.name}>
-                                {p.label}
-                              </SelectItem>
-                            ))}
-                        </SelectGroup>
-                        <SelectGroup>
-                          <SelectLabel>Common Actions</SelectLabel>
-                          {permissions
-                            .filter((p) => p.category === "action")
-                            .map((p) => (
-                              <SelectItem key={p.name} value={p.name}>
-                                {p.label}
-                              </SelectItem>
-                            ))}
-                        </SelectGroup>
-                      </>
+                      permissions.map((p) => (
+                        <SelectItem key={p.name} value={p.name}>
+                          {p.label}
+                        </SelectItem>
+                      ))
                     )}
                   </SelectContent>
                 </Select>
@@ -171,12 +165,25 @@ export function PermissionTesterPage() {
                     <SelectValue placeholder="Select object..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {resources.length === 0 && bookings.length === 0 ? (
+                    {orgs.length === 0 && resources.length === 0 && bookings.length === 0 ? (
                       <SelectItem value="none" disabled>
                         No objects available
                       </SelectItem>
                     ) : (
                       <>
+                        {orgs.length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel>Organizations</SelectLabel>
+                            {orgs.map((o) => (
+                              <SelectItem
+                                key={o._id}
+                                value={`org:${o._id}`}
+                              >
+                                {o.name}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
                         {resources.length > 0 && (
                           <SelectGroup>
                             <SelectLabel>Resources</SelectLabel>
@@ -264,7 +271,7 @@ export function PermissionTesterPage() {
         )}
 
         {/* All Permissions Panel */}
-        {userId && parsedObject && (allPermissions || bookingPermissions) && (
+        {userId && parsedObject && (orgPermissions || resourcePermissions || bookingPermissions) && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
@@ -274,18 +281,40 @@ export function PermissionTesterPage() {
                 Shows all permissions{" "}
                 {users.find((u) => u._id === userId)?.name ?? "user"} has on
                 this{" "}
-                {parsedObject.type === "resource"
+                {parsedObject.type === "org"
+                  ? orgs.find((o) => o._id === parsedObject.id)?.name
+                  : parsedObject.type === "resource"
                   ? resources.find((r) => r._id === parsedObject.id)?.name
                   : bookings.find((b) => b._id === parsedObject.id)?.title}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {parsedObject.type === "resource" &&
-                  allPermissions &&
+                {parsedObject.type === "org" &&
+                  orgPermissions &&
                   (["create", "read", "update", "delete"] as const).map(
                     (perm) => {
-                      const allowed = allPermissions[perm];
+                      const allowed = orgPermissions[perm];
+                      return (
+                        <div
+                          key={perm}
+                          className={cn(
+                            "px-3 py-1.5 rounded-md text-sm font-medium border",
+                            allowed
+                              ? "bg-green-500/10 border-green-500 text-green-700 dark:text-green-400"
+                              : "bg-muted border-border text-muted-foreground"
+                          )}
+                        >
+                          {perm}
+                        </div>
+                      );
+                    }
+                  )}
+                {parsedObject.type === "resource" &&
+                  resourcePermissions &&
+                  (["create", "read", "update", "delete"] as const).map(
+                    (perm) => {
+                      const allowed = resourcePermissions[perm];
                       return (
                         <div
                           key={perm}
@@ -303,7 +332,7 @@ export function PermissionTesterPage() {
                   )}
                 {parsedObject.type === "booking" &&
                   bookingPermissions &&
-                  (["create", "read", "update", "delete", "cancel"] as const).map(
+                  (["create", "read", "update", "delete"] as const).map(
                     (perm) => {
                       const allowed = bookingPermissions[perm];
                       return (
