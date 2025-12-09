@@ -44,6 +44,19 @@ export interface SubjectRef {
   id: string;
 }
 
+// Helper functions for common argument mappings
+const mapObject = (o: ObjectRef) => ({ objectType: o.type, objectId: o.id });
+const mapSubject = (s: SubjectRef) => ({ subjectType: s.type, subjectId: s.id });
+const mapObjRelSub = (o: ObjectRef, relation: string, s: SubjectRef) => ({
+  ...mapObject(o), relation, ...mapSubject(s)
+});
+const mapCanArgs = (args: { subject: SubjectRef; action: string; object: ObjectRef }) => ({
+  ...mapObject(args.object), action: args.action, ...mapSubject(args.subject)
+});
+const mapPermsArgs = (args: { subject: SubjectRef; object: ObjectRef }) => ({
+  ...mapObject(args.object), ...mapSubject(args.subject)
+});
+
 /**
  * Create a Zanvex client for use in app functions
  *
@@ -62,20 +75,8 @@ export function createZanvexClient(component: ComponentApi) {
      * // Add user to org
      * await zanvex.write(ctx, { type: "org", id: "acme" }, "member_of", { type: "user", id: "daniel" });
      */
-    write: (
-      ctx: MutationCtx,
-      object: ObjectRef,
-      relation: string,
-      subject: SubjectRef
-    ) => {
-      return ctx.runMutation(component.tuples.write, {
-        objectType: object.type,
-        objectId: object.id,
-        relation,
-        subjectType: subject.type,
-        subjectId: subject.id,
-      });
-    },
+    write: (ctx: MutationCtx, object: ObjectRef, relation: string, subject: SubjectRef) =>
+      ctx.runMutation(component.tuples.write, mapObjRelSub(object, relation, subject)),
 
     /**
      * Delete a relationship tuple
@@ -86,20 +87,8 @@ export function createZanvexClient(component: ComponentApi) {
      * // Remove user from org
      * await zanvex.remove(ctx, { type: "org", id: "acme" }, "member_of", { type: "user", id: "daniel" });
      */
-    remove: (
-      ctx: MutationCtx,
-      object: ObjectRef,
-      relation: string,
-      subject: SubjectRef
-    ) => {
-      return ctx.runMutation(component.tuples.remove, {
-        objectType: object.type,
-        objectId: object.id,
-        relation,
-        subjectType: subject.type,
-        subjectId: subject.id,
-      });
-    },
+    remove: (ctx: MutationCtx, object: ObjectRef, relation: string, subject: SubjectRef) =>
+      ctx.runMutation(component.tuples.remove, mapObjRelSub(object, relation, subject)),
 
     /**
      * Delete all tuples for an object
@@ -110,12 +99,8 @@ export function createZanvexClient(component: ComponentApi) {
      * // When deleting a resource, remove all permissions
      * await zanvex.removeAllForObject(ctx, { type: "resource", id: "studio-a" });
      */
-    removeAllForObject: (ctx: MutationCtx, object: ObjectRef) => {
-      return ctx.runMutation(component.tuples.removeAllForObject, {
-        objectType: object.type,
-        objectId: object.id,
-      });
-    },
+    removeAllForObject: (ctx: MutationCtx, object: ObjectRef) =>
+      ctx.runMutation(component.tuples.removeAllForObject, mapObject(object)),
 
     /**
      * Delete all tuples for a subject
@@ -126,12 +111,8 @@ export function createZanvexClient(component: ComponentApi) {
      * // When deleting a user, remove all their permissions
      * await zanvex.removeAllForSubject(ctx, { type: "user", id: "daniel" });
      */
-    removeAllForSubject: (ctx: MutationCtx, subject: SubjectRef) => {
-      return ctx.runMutation(component.tuples.removeAllForSubject, {
-        subjectType: subject.type,
-        subjectId: subject.id,
-      });
-    },
+    removeAllForSubject: (ctx: MutationCtx, subject: SubjectRef) =>
+      ctx.runMutation(component.tuples.removeAllForSubject, mapSubject(subject)),
 
     /**
      * Check if subject has relation to object (with 1-hop traversal)
@@ -145,20 +126,8 @@ export function createZanvexClient(component: ComponentApi) {
      * // With traversal: user:daniel is member of org:acme, which owns resource:studio-a
      * // → Returns true because of the indirect path
      */
-    check: (
-      ctx: QueryCtx,
-      object: ObjectRef,
-      relation: string,
-      subject: SubjectRef
-    ) => {
-      return ctx.runQuery(component.check.check, {
-        objectType: object.type,
-        objectId: object.id,
-        relation,
-        subjectType: subject.type,
-        subjectId: subject.id,
-      });
-    },
+    check: (ctx: QueryCtx, object: ObjectRef, relation: string, subject: SubjectRef) =>
+      ctx.runQuery(component.check.check, mapObjRelSub(object, relation, subject)),
 
     /**
      * List all subjects with a specific relation to an object
@@ -168,13 +137,8 @@ export function createZanvexClient(component: ComponentApi) {
      * const owners = await zanvex.listSubjects(ctx, { type: "resource", id: "studio-a" }, "owner");
      * // → [{ type: "org", id: "acme" }]
      */
-    listSubjects: (ctx: QueryCtx, object: ObjectRef, relation: string) => {
-      return ctx.runQuery(component.check.listSubjects, {
-        objectType: object.type,
-        objectId: object.id,
-        relation,
-      });
-    },
+    listSubjects: (ctx: QueryCtx, object: ObjectRef, relation: string) =>
+      ctx.runQuery(component.check.listSubjects, { ...mapObject(object), relation }),
 
     /**
      * List all relations a subject has
@@ -184,12 +148,8 @@ export function createZanvexClient(component: ComponentApi) {
      * const relations = await zanvex.listRelations(ctx, { type: "user", id: "daniel" });
      * // → [{ objectType: "org", objectId: "acme", relation: "member_of" }]
      */
-    listRelations: (ctx: QueryCtx, subject: SubjectRef) => {
-      return ctx.runQuery(component.check.listRelations, {
-        subjectType: subject.type,
-        subjectId: subject.id,
-      });
-    },
+    listRelations: (ctx: QueryCtx, subject: SubjectRef) =>
+      ctx.runQuery(component.check.listRelations, mapSubject(subject)),
 
     /**
      * List all tuples for an object (all relations, all subjects)
@@ -199,12 +159,8 @@ export function createZanvexClient(component: ComponentApi) {
      * const tuples = await zanvex.listTuplesForObject(ctx, { type: "resource", id: "studio-a" });
      * // → [{ relation: "owner", subjectType: "org", subjectId: "acme" }]
      */
-    listTuplesForObject: (ctx: QueryCtx, object: ObjectRef) => {
-      return ctx.runQuery(component.check.listTuplesForObject, {
-        objectType: object.type,
-        objectId: object.id,
-      });
-    },
+    listTuplesForObject: (ctx: QueryCtx, object: ObjectRef) =>
+      ctx.runQuery(component.check.listTuplesForObject, mapObject(object)),
 
     /**
      * Delete ALL tuples in the database
@@ -217,9 +173,7 @@ export function createZanvexClient(component: ComponentApi) {
      * // Clear all permissions (for testing/reset)
      * const deleted = await zanvex.clearAll(ctx);
      */
-    clearAll: (ctx: MutationCtx) => {
-      return ctx.runMutation(component.tuples.clearAll, {});
-    },
+    clearAll: (ctx: MutationCtx) => ctx.runMutation(component.tuples.clearAll, {}),
 
     // ============================================
     // PERMISSION RULES (Zanzibar-style DSL)
@@ -247,60 +201,24 @@ export function createZanvexClient(component: ComponentApi) {
      * // OR logic (admin through hierarchy OR direct booker relation)
      * await zanvex.definePermission(ctx, "booking", "cancel", "parent->edit | booker");
      */
-    definePermission: (
-      ctx: MutationCtx,
-      objectType: string,
-      permission: string,
-      expression: string
-    ) => {
-      return ctx.runMutation(component.rules.definePermission as any, {
-        objectType,
-        permission,
-        expression,
-      });
-    },
+    definePermission: (ctx: MutationCtx, objectType: string, permission: string, expression: string) =>
+      ctx.runMutation(component.rules.definePermission as any, { objectType, permission, expression }),
 
-    /**
-     * Get a specific permission rule
-     */
-    getPermissionRule: (
-      ctx: QueryCtx,
-      objectType: string,
-      permission: string
-    ) => {
-      return ctx.runQuery(component.rules.getPermissionRule as any, {
-        objectType,
-        permission,
-      });
-    },
+    /** Get a specific permission rule */
+    getPermissionRule: (ctx: QueryCtx, objectType: string, permission: string) =>
+      ctx.runQuery(component.rules.getPermissionRule as any, { objectType, permission }),
 
-    /**
-     * List all permission rules
-     */
-    listPermissionRules: (ctx: QueryCtx) => {
-      return ctx.runQuery(component.rules.listPermissionRules as any, {});
-    },
+    /** List all permission rules */
+    listPermissionRules: (ctx: QueryCtx) =>
+      ctx.runQuery(component.rules.listPermissionRules as any, {}),
 
-    /**
-     * Delete a permission rule
-     */
-    deletePermissionRule: (
-      ctx: MutationCtx,
-      objectType: string,
-      permission: string
-    ) => {
-      return ctx.runMutation(component.rules.deletePermissionRule as any, {
-        objectType,
-        permission,
-      });
-    },
+    /** Delete a permission rule */
+    deletePermissionRule: (ctx: MutationCtx, objectType: string, permission: string) =>
+      ctx.runMutation(component.rules.deletePermissionRule as any, { objectType, permission }),
 
-    /**
-     * Clear all permission rules
-     */
-    clearAllRules: (ctx: MutationCtx) => {
-      return ctx.runMutation(component.rules.clearAllRules as any, {});
-    },
+    /** Clear all permission rules */
+    clearAllRules: (ctx: MutationCtx) =>
+      ctx.runMutation(component.rules.clearAllRules as any, {}),
 
     // ============================================
     // OBJECT TYPES SCHEMA REGISTRY
@@ -320,60 +238,32 @@ export function createZanvexClient(component: ComponentApi) {
      */
     registerObjectType: (
       ctx: MutationCtx,
-      args: {
-        name: string;
-        description?: string;
-        relations: Array<{
-          name: string;
-          targetType: string;
-          description?: string;
-        }>;
-      }
-    ) => {
-      return ctx.runMutation(component.objectTypes.registerObjectType, args);
-    },
+      args: { name: string; description?: string; relations: Array<{ name: string; targetType: string; description?: string }> }
+    ) => ctx.runMutation(component.objectTypes.registerObjectType, args),
 
-    /**
-     * Get a specific object type by name
-     */
-    getObjectType: (ctx: QueryCtx, name: string) => {
-      return ctx.runQuery(component.objectTypes.getObjectType, { name });
-    },
+    /** Get a specific object type by name */
+    getObjectType: (ctx: QueryCtx, name: string) =>
+      ctx.runQuery(component.objectTypes.getObjectType, { name }),
 
-    /**
-     * List all registered object types
-     */
-    listObjectTypes: (ctx: QueryCtx) => {
-      return ctx.runQuery(component.objectTypes.listObjectTypes, {});
-    },
+    /** List all registered object types */
+    listObjectTypes: (ctx: QueryCtx) =>
+      ctx.runQuery(component.objectTypes.listObjectTypes, {}),
 
-    /**
-     * Delete an object type
-     */
-    deleteObjectType: (ctx: MutationCtx, name: string) => {
-      return ctx.runMutation(component.objectTypes.deleteObjectType, { name });
-    },
+    /** Delete an object type */
+    deleteObjectType: (ctx: MutationCtx, name: string) =>
+      ctx.runMutation(component.objectTypes.deleteObjectType, { name }),
 
-    /**
-     * Clear all object types
-     */
-    clearAllObjectTypes: (ctx: MutationCtx) => {
-      return ctx.runMutation(component.objectTypes.clearAllObjectTypes, {});
-    },
+    /** Clear all object types */
+    clearAllObjectTypes: (ctx: MutationCtx) =>
+      ctx.runMutation(component.objectTypes.clearAllObjectTypes, {}),
 
-    /**
-     * Get valid relations for an object type (for UI dropdowns)
-     */
-    getRelationsForType: (ctx: QueryCtx, objectType: string) => {
-      return ctx.runQuery(component.objectTypes.getRelationsForType, { objectType });
-    },
+    /** Get valid relations for an object type (for UI dropdowns) */
+    getRelationsForType: (ctx: QueryCtx, objectType: string) =>
+      ctx.runQuery(component.objectTypes.getRelationsForType, { objectType }),
 
-    /**
-     * Get all permissions defined for an object type
-     */
-    getPermissionsForType: (ctx: QueryCtx, objectType: string) => {
-      return ctx.runQuery(component.objectTypes.getPermissionsForType, { objectType });
-    },
+    /** Get all permissions defined for an object type */
+    getPermissionsForType: (ctx: QueryCtx, objectType: string) =>
+      ctx.runQuery(component.objectTypes.getPermissionsForType, { objectType }),
 
     // ============================================
     // PERMISSION CATALOG
@@ -382,48 +272,29 @@ export function createZanvexClient(component: ComponentApi) {
     /**
      * List all active permissions (for dropdowns)
      *
-     * Returns permissions grouped by category (CRUD vs Actions).
-     *
      * @example
      * const permissions = await zanvex.listPermissions(ctx);
-     * // [
-     * //   { name: "create", label: "Create", category: "crud" },
-     * //   { name: "cancel", label: "Cancel", category: "action" }
-     * // ]
+     * // [{ name: "create", label: "Create", category: "crud" }, ...]
      */
-    listPermissions: (ctx: QueryCtx) => {
-      return ctx.runQuery(component.permissionCatalog.listPermissions, {});
-    },
+    listPermissions: (ctx: QueryCtx) =>
+      ctx.runQuery(component.permissionCatalog.listPermissions, {}),
 
     /**
      * Register a custom permission
      *
      * @example
      * await zanvex.registerPermission(ctx, {
-     *   name: "review",
-     *   label: "Review",
-     *   description: "Review and provide feedback",
-     *   category: "action"
+     *   name: "review", label: "Review", description: "Review and provide feedback", category: "action"
      * });
      */
     registerPermission: (
       ctx: MutationCtx,
-      args: {
-        name: string;
-        label: string;
-        description?: string;
-        category: "crud" | "action";
-      }
-    ) => {
-      return ctx.runMutation(component.permissionCatalog.registerPermission, args);
-    },
+      args: { name: string; label: string; description?: string; category: "crud" | "action" }
+    ) => ctx.runMutation(component.permissionCatalog.registerPermission, args),
 
-    /**
-     * Deactivate a permission (soft delete)
-     */
-    deactivatePermission: (ctx: MutationCtx, name: string) => {
-      return ctx.runMutation(component.permissionCatalog.deactivatePermission, { name });
-    },
+    /** Deactivate a permission (soft delete) */
+    deactivatePermission: (ctx: MutationCtx, name: string) =>
+      ctx.runMutation(component.permissionCatalog.deactivatePermission, { name }),
 
     // ============================================
     // RELATION CATALOG
@@ -434,42 +305,25 @@ export function createZanvexClient(component: ComponentApi) {
      *
      * @example
      * const relationNames = await zanvex.listRelationNames(ctx);
-     * // [
-     * //   { name: "parent", label: "parent", description: "Parent/container relation" },
-     * //   { name: "owner", label: "owner", description: "Ownership relation" }
-     * // ]
+     * // [{ name: "parent", label: "parent", description: "Parent/container relation" }, ...]
      */
-    listRelationNames: (ctx: QueryCtx) => {
-      return ctx.runQuery(component.relationCatalog.listRelationNames, {});
-    },
+    listRelationNames: (ctx: QueryCtx) =>
+      ctx.runQuery(component.relationCatalog.listRelationNames, {}),
 
     /**
      * Register a custom relation name
      *
      * @example
-     * await zanvex.registerRelationName(ctx, {
-     *   name: "reviewer",
-     *   label: "reviewer",
-     *   description: "Who reviews this instance"
-     * });
+     * await zanvex.registerRelationName(ctx, { name: "reviewer", label: "reviewer", description: "Who reviews" });
      */
     registerRelationName: (
       ctx: MutationCtx,
-      args: {
-        name: string;
-        label: string;
-        description?: string;
-      }
-    ) => {
-      return ctx.runMutation(component.relationCatalog.registerRelationName, args);
-    },
+      args: { name: string; label: string; description?: string }
+    ) => ctx.runMutation(component.relationCatalog.registerRelationName, args),
 
-    /**
-     * Deactivate a relation name (soft delete)
-     */
-    deactivateRelationName: (ctx: MutationCtx, name: string) => {
-      return ctx.runMutation(component.relationCatalog.deactivateRelationName, { name });
-    },
+    /** Deactivate a relation name (soft delete) */
+    deactivateRelationName: (ctx: MutationCtx, name: string) =>
+      ctx.runMutation(component.relationCatalog.deactivateRelationName, { name }),
 
     // ============================================
     // THE MAGIC: ACTION-BASED PERMISSION CHECKS
@@ -479,51 +333,20 @@ export function createZanvexClient(component: ComponentApi) {
      * Check if a subject can perform an action on an object
      *
      * This is the main API for permission checks!
-     * Now supports object-type-specific permissions.
      *
      * @example
-     * // Can daniel delete this resource?
-     * const result = await zanvex.can(ctx, {
-     *   subject: { type: "user", id: "daniel" },
-     *   action: "delete",
-     *   object: { type: "resource", id: "studio-a" },
-     * });
-     *
-     * // Can daniel cancel this booking?
      * const result = await zanvex.can(ctx, {
      *   subject: { type: "user", id: "daniel" },
      *   action: "cancel",
      *   object: { type: "booking", id: "booking-123" },
      * });
-     *
-     * if (!result.allowed) {
-     *   throw new Error(`Forbidden: ${result.reason}`);
-     * }
+     * if (!result.allowed) throw new Error(`Forbidden: ${result.reason}`);
      */
-    can: (
-      ctx: QueryCtx,
-      args: {
-        subject: SubjectRef;
-        action: string;
-        object: ObjectRef;
-      }
-    ) => {
-      return ctx.runQuery(component.permissions.can, {
-        objectType: args.object.type,
-        objectId: args.object.id,
-        action: args.action,
-        subjectType: args.subject.type,
-        subjectId: args.subject.id,
-      });
-    },
+    can: (ctx: QueryCtx, args: { subject: SubjectRef; action: string; object: ObjectRef }) =>
+      ctx.runQuery(component.permissions.can, mapCanArgs(args)),
 
     /**
      * Check permissions with detailed traversal path tracking
-     *
-     * Returns comprehensive debugging information including:
-     * - Exact path taken through the object graph
-     * - Which rule granted access
-     * - Detailed failure information for denied permissions
      *
      * Use this for debugging, audit logs, or UI permission tester/graph visualizations.
      *
@@ -533,57 +356,23 @@ export function createZanvexClient(component: ComponentApi) {
      *   action: "cancel",
      *   object: { type: "booking", id: "booking-123" },
      * });
-     *
-     * if (result.allowed) {
-     *   console.log("Allowed via:", result.matchedRule);
-     *   console.log("Path:", result.path);
-     * } else {
-     *   console.log("Denied. Tried paths:", result.triedPaths);
-     * }
+     * if (result.allowed) console.log("Allowed via:", result.matchedRule, result.path);
      */
-    canWithPath: (
-      ctx: QueryCtx,
-      args: {
-        subject: SubjectRef;
-        action: string;
-        object: ObjectRef;
-      }
-    ) => {
-      return ctx.runQuery(component.permissions.canWithPath, {
-        objectType: args.object.type,
-        objectId: args.object.id,
-        action: args.action,
-        subjectType: args.subject.type,
-        subjectId: args.subject.id,
-      });
-    },
+    canWithPath: (ctx: QueryCtx, args: { subject: SubjectRef; action: string; object: ObjectRef }) =>
+      ctx.runQuery(component.permissions.canWithPath, mapCanArgs(args)),
 
     /**
      * Get all permissions a subject has on an object
-     *
-     * Returns { create, read, update, delete, cancel, actions, relation }
      *
      * @example
      * const perms = await zanvex.getPermissionsForObject(ctx, {
      *   subject: { type: "user", id: "daniel" },
      *   object: { type: "booking", id: "booking-123" },
      * });
-     * // { create: false, read: true, update: false, delete: false, cancel: true, actions: ["read", "cancel"], relation: "booker" }
+     * // { create: false, read: true, cancel: true, actions: ["read", "cancel"] }
      */
-    getPermissionsForObject: (
-      ctx: QueryCtx,
-      args: {
-        subject: SubjectRef;
-        object: ObjectRef;
-      }
-    ) => {
-      return ctx.runQuery(component.permissions.getPermissionsForObject, {
-        objectType: args.object.type,
-        objectId: args.object.id,
-        subjectType: args.subject.type,
-        subjectId: args.subject.id,
-      });
-    },
+    getPermissionsForObject: (ctx: QueryCtx, args: { subject: SubjectRef; object: ObjectRef }) =>
+      ctx.runQuery(component.permissions.getPermissionsForObject, mapPermsArgs(args)),
   };
 }
 
