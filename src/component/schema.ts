@@ -112,34 +112,6 @@ export default defineSchema({
     ]),
 
   /**
-   * Permission Schema (Legacy)
-   *
-   * Defines what actions each relation grants, optionally per object type.
-   * This is the "policy" that determines what admin_of vs member_of can do.
-   *
-   * Example:
-   *   { relation: "admin_of", objectType: "*", actions: ["create", "read", "update", "delete"] }
-   *   { relation: "member_of", objectType: "resource", actions: ["read"] }
-   *   { relation: "member_of", objectType: "booking", actions: ["read", "cancel"] }
-   *   { relation: "booker", objectType: "booking", actions: ["read", "cancel"] }
-   *
-   * When checking `can(user, "delete", resource)`:
-   *   1. Find path: user → admin_of → org → owner → resource
-   *   2. Look up (admin_of, resource) or (admin_of, *) in this table
-   *   3. Check if "delete" is in actions array
-   *   4. Return true/false
-   *
-   * objectType: "*" means "applies to all object types" (default/fallback)
-   */
-  permission_schema: defineTable({
-    relation: v.string(), // "admin_of", "member_of", "editor", "viewer", "booker"
-    objectType: v.string(), // "resource", "booking", "*" (wildcard for all)
-    actions: v.array(v.string()), // ["create", "read", "update", "delete", "cancel"]
-  })
-    .index("by_relation", ["relation"])
-    .index("by_relation_objectType", ["relation", "objectType"]),
-
-  /**
    * Permission Rules (Zanzibar-style)
    *
    * Defines how permissions are computed from relations using a DSL.
