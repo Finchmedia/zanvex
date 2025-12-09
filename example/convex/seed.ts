@@ -45,6 +45,7 @@ import { createZanvexClient } from "@mrfinch/zanvex";
 import { components } from "./_generated/api.js";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel.js";
+import { PERMISSIONS, RELATION_NAMES } from "./constants.js";
 
 const zanvex = createZanvexClient(components.zanvex);
 
@@ -54,20 +55,12 @@ const zanvex = createZanvexClient(components.zanvex);
 export const seedPermissions = mutation({
   args: {},
   handler: async (ctx) => {
-    const permissions = [
-      // CRUD Operations
-      { name: "create", label: "Create", description: "Create new instances", category: "crud" as const },
-      { name: "read", label: "Read", description: "View/read instances", category: "crud" as const },
-      { name: "update", label: "Update", description: "Modify existing instances", category: "crud" as const },
-      { name: "delete", label: "Delete", description: "Remove instances", category: "crud" as const },
-    ];
-
-    for (const perm of permissions) {
+    for (const perm of PERMISSIONS) {
       await zanvex.registerPermission(ctx, perm);
     }
 
-    console.log(`Seeded ${permissions.length} permissions`);
-    return { total: permissions.length };
+    console.log(`Seeded ${PERMISSIONS.length} permissions`);
+    return { total: PERMISSIONS.length };
   },
 });
 
@@ -77,33 +70,12 @@ export const seedPermissions = mutation({
 export const seedRelations = mutation({
   args: {},
   handler: async (ctx) => {
-    const relationNames = [
-      // Structural relations
-      { name: "parent", label: "parent", description: "Parent/container relation" },
-      { name: "owner", label: "owner", description: "Ownership relation" },
-      { name: "child", label: "child", description: "Child/contained relation" },
-
-      // Membership relations
-      { name: "member_of", label: "member_of", description: "Membership relation" },
-      { name: "admin_of", label: "admin_of", description: "Admin/manager relation" },
-
-      // Assignment relations
-      { name: "booker", label: "booker", description: "Who made the booking" },
-      { name: "assignee", label: "assignee", description: "Who is assigned/responsible" },
-      { name: "creator", label: "creator", description: "Who created this instance" },
-
-      // Permission-based relations
-      { name: "viewer", label: "viewer", description: "Who can view" },
-      { name: "editor", label: "editor", description: "Who can edit" },
-      { name: "collaborator", label: "collaborator", description: "Who can collaborate" },
-    ];
-
-    for (const rel of relationNames) {
+    for (const rel of RELATION_NAMES) {
       await zanvex.registerRelationName(ctx, rel);
     }
 
-    console.log(`Seeded ${relationNames.length} relations`);
-    return { total: relationNames.length };
+    console.log(`Seeded ${RELATION_NAMES.length} relations`);
+    return { total: RELATION_NAMES.length };
   },
 });
 

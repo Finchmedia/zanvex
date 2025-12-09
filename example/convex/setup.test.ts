@@ -1,5 +1,4 @@
 /// <reference types="vite/client" />
-import { test } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema.js";
 import component from "@mrfinch/zanvex/test";
@@ -12,5 +11,3 @@ export function initConvexTest() {
   component.register(t);
   return t;
 }
-
-test("setup", () => {});

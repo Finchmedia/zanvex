@@ -1,5 +1,4 @@
 /// <reference types="vite/client" />
-import { test } from "vitest";
 import { convexTest } from "convex-test";
 export const modules = import.meta.glob("./**/*.*s");
 
@@ -22,5 +21,3 @@ export function initConvexTest<
 export const components = componentsGeneric() as unknown as {
   zanvex: ComponentApi;
 };
-
-test("setup", () => {});
