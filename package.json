@@ -17,7 +17,7 @@
     "dev": "run-p -r 'dev:*'",
     "dev:backend": "convex dev --typecheck-components",
     "dev:frontend": "cd example && vite --clearScreen false",
-    "dev:build": "chokidar 'tsconfig*.json' 'src/**/*.ts' -i '**/*.test.ts' -c 'npm run build:codegen' --initial",
+    "dev:build": "chokidar 'tsconfig*.json' 'src/**/*.ts' -c 'npm run build:codegen' --initial",
     "predev": "path-exists .env.local dist || (npm run build && convex dev --once)",
     "clean": "rm -rf dist *.tsbuildinfo",
     "build": "tsc --project ./tsconfig.build.json",
@@ -25,13 +25,8 @@
     "build:clean": "rm -rf dist *.tsbuildinfo && npm run build:codegen",
     "typecheck": "tsc --noEmit && tsc -p example && tsc -p example/convex",
     "lint": "eslint .",
-    "all": "run-p -r 'dev:*' 'test:watch'",
-    "test": "vitest run --typecheck",
-    "test:watch": "vitest --typecheck --clearScreen false",
-    "test:debug": "vitest --inspect-brk --no-file-parallelism",
-    "test:coverage": "vitest run --coverage --coverage.reporter=text",
     "prepublishOnly": "npm run clean && npm run build",
-    "preversion": "npm run clean && npm ci && npm run build && run-p test lint typecheck",
+    "preversion": "npm run clean && npm ci && npm run build && run-p lint typecheck",
     "alpha": "npm version prerelease --preid alpha && npm publish --tag alpha && git push --follow-tags",
     "release": "npm version patch && npm publish && git push --follow-tags",
     "version": "vim -c 'normal o' -c 'normal o## '$npm_package_version CHANGELOG.md && prettier -w CHANGELOG.md && git add CHANGELOG.md"
@@ -50,7 +45,6 @@
       "types": "./dist/react/index.d.ts",
       "default": "./dist/react/index.js"
     },
-    "./test": "./src/test.ts",
     "./_generated/component.js": {
       "types": "./dist/component/_generated/component.d.ts"
     },
@@ -72,7 +66,6 @@
   },
   "devDependencies": {
     "@convex-dev/eslint-plugin": "^1.0.0",
-    "@edge-runtime/vm": "^5.0.0",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "9.39.1",
     "@types/node": "^20.19.25",
@@ -81,7 +74,6 @@
     "@vitejs/plugin-react": "^5.1.1",
     "chokidar-cli": "3.0.0",
     "convex": "1.29.3",
-    "convex-test": "0.0.40",
     "cpy-cli": "^6.0.0",
     "eslint": "9.39.1",
     "eslint-plugin-react": "^7.37.5",
@@ -96,8 +88,7 @@
     "react-dom": "^19.2.1",
     "typescript": "5.9.3",
     "typescript-eslint": "8.47.0",
-    "vite": "7.2.6",
-    "vitest": "3.2.4"
+    "vite": "7.2.6"
   },
   "types": "./dist/client/index.d.ts",
   "module": "./dist/client/index.js",
