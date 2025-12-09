@@ -150,6 +150,9 @@ export const canWithPath = query({
 
 /**
  * Internal recursive implementation of permission checking
+ *
+ * This is a simplified wrapper around canRecursiveWithPath that
+ * returns a simplified result (string path instead of TraversalNode array).
  */
 async function canRecursive(
   ctx: any,
@@ -163,108 +166,18 @@ async function canRecursive(
   depth: number,
   path: string[]
 ): Promise<{ allowed: boolean; reason?: string; path?: string[] }> {
-  // Prevent infinite loops
-  if (depth > MAX_DEPTH) {
-    return {
-      allowed: false,
-      reason: "Max traversal depth exceeded",
-      path,
-    };
-  }
+  // Use the full implementation and simplify the result
+  const result = await canRecursiveWithPath(ctx, args, depth, [], []);
 
-  const currentPath = [
-    ...path,
-    `${args.objectType}:${args.objectId}.${args.action}`,
-  ];
-
-  // 1. Look up permission rule for this (objectType, permission)
-  const rule = await ctx.db
-    .query("permission_rules")
-    .withIndex("by_type_permission", (q: any) =>
-      q.eq("objectType", args.objectType).eq("permission", args.action)
-    )
-    .first();
-
-  // 2. No rule? Default to direct relation check
-  if (!rule) {
-    const direct = await checkDirectTuple(ctx, {
-      objectType: args.objectType,
-      objectId: args.objectId,
-      relation: args.action, // Use action as relation name
-      subjectType: args.subjectType,
-      subjectId: args.subjectId,
-    });
-
-    return {
-      allowed: direct,
-      reason: direct
-        ? `Direct ${args.action} relation`
-        : `No ${args.action} relation found`,
-      path: currentPath,
-    };
-  }
-
-  // 3. Evaluate rules (OR logic - any matching rule grants access)
-  for (const part of rule.rules) {
-    if (part.type === "direct") {
-      // Check for direct relation tuple
-      const hasTuple = await checkDirectTuple(ctx, {
-        objectType: args.objectType,
-        objectId: args.objectId,
-        relation: part.relation!,
-        subjectType: args.subjectType,
-        subjectId: args.subjectId,
-      });
-
-      if (hasTuple) {
-        return {
-          allowed: true,
-          reason: `Direct ${part.relation} relation`,
-          path: currentPath,
-        };
-      }
-    } else if (part.type === "computed") {
-      // Find related objects via sourceRelation
-      const related = await ctx.db
-        .query("tuples")
-        .withIndex("by_object", (q: any) =>
-          q
-            .eq("objectType", args.objectType)
-            .eq("objectId", args.objectId)
-            .eq("relation", part.sourceRelation)
-        )
-        .collect();
-
-      // Recursively check permission on each related object
-      for (const rel of related) {
-        const result = await canRecursive(
-          ctx,
-          {
-            objectType: rel.subjectType,
-            objectId: rel.subjectId,
-            action: part.targetPermission!,
-            subjectType: args.subjectType,
-            subjectId: args.subjectId,
-          },
-          depth + 1,
-          currentPath
-        );
-
-        if (result.allowed) {
-          return {
-            allowed: true,
-            reason: `${part.sourceRelation}->${part.targetPermission}`,
-            path: result.path,
-          };
-        }
-      }
-    }
-  }
+  // Convert TraversalNode[] to string[] for backwards compatibility
+  const simplePath = result.path
+    ? result.path.map(node => `${node.nodeType}:${node.nodeId}${node.permission ? `.${node.permission}` : node.relation ? `.${node.relation}` : ''}`)
+    : [...path, `${args.objectType}:${args.objectId}.${args.action}`];
 
   return {
-    allowed: false,
-    reason: "No matching rule granted access",
-    path: currentPath,
+    allowed: result.allowed,
+    reason: result.reason,
+    path: simplePath,
   };
 }
 
