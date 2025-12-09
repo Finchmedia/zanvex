@@ -27,28 +27,22 @@ cd zanvex
 npm install
 ```
 
-### 2. Generate Component Types
-
-```bash
-npx convex codegen --component-dir ./src/component
-```
-
-This generates TypeScript types for the component before the first build.
-
-### 3. Set Up Convex & Start Dev Servers
+### 2. Start Development Servers
 
 ```bash
 npm run dev
 ```
 
 On first run, this will:
+- Automatically build the component (including codegen)
 - Prompt you to create/link a Convex project
 - Create `.env.local` with your deployment URL
-- Build the component
 - Start Convex backend
 - Start Vite frontend
 
-### 4. Seed Demo Data
+No manual codegen step needed! The `predev` script detects if the `dist` folder is missing and automatically runs the build.
+
+### 3. Seed Demo Data
 
 Populate the database with demo organizations, users, resources, and bookings:
 
