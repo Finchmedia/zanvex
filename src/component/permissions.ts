@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 import { query } from "./_generated/server.js";
 
 /**
@@ -24,33 +24,40 @@ import { query } from "./_generated/server.js";
 const MAX_DEPTH = 10;
 
 /**
- * Path Tracking Types for Traversal Visualization
+ * Path Tracking Validators & Types
+ *
+ * Single source of truth - TypeScript types derived from Convex validators.
  */
 
-/** Represents a node in the permission check traversal path */
-interface TraversalNode {
-  nodeType: string;      // "user", "org", "resource", "booking"
-  nodeId: string;        // ID of the node
-  relation?: string;     // Relation used to reach this node ("admin_of", "owner", "parent")
-  permission?: string;   // Permission checked at this node (for computed permissions)
-  depth: number;         // Depth in traversal (0 = starting point)
-}
+/** Validator for traversal path nodes */
+export const traversalNodeValidator = v.object({
+  nodeType: v.string(),
+  nodeId: v.string(),
+  relation: v.optional(v.string()),
+  permission: v.optional(v.string()),
+  depth: v.number(),
+});
 
-/** Represents an attempted path that failed during permission check */
-interface TriedPath {
-  rulePart: string;           // Which DSL rule part was tried (e.g., "parent->edit")
-  failureReason: string;      // Why it failed
-  partialPath?: TraversalNode[]; // How far we got before failing
-}
+/** Validator for failed path attempts */
+export const triedPathValidator = v.object({
+  rulePart: v.string(),
+  failureReason: v.string(),
+  partialPath: v.optional(v.array(traversalNodeValidator)),
+});
 
-/** Enhanced result with full traversal path information */
-interface PathResult {
-  allowed: boolean;
-  reason: string;               // Human-readable explanation
-  matchedRule?: string;         // DSL expression that succeeded (e.g., "parent->edit")
-  path?: TraversalNode[];       // Only present if allowed - the successful path
-  triedPaths?: TriedPath[];     // Only present if denied - failed attempts
-}
+/** Validator for full path result */
+export const pathResultValidator = v.object({
+  allowed: v.boolean(),
+  reason: v.string(),
+  matchedRule: v.optional(v.string()),
+  path: v.optional(v.array(traversalNodeValidator)),
+  triedPaths: v.optional(v.array(triedPathValidator)),
+});
+
+// Derive TypeScript types from validators
+export type TraversalNode = Infer<typeof traversalNodeValidator>;
+export type TriedPath = Infer<typeof triedPathValidator>;
+export type PathResult = Infer<typeof pathResultValidator>;
 
 /**
  * Check if a subject can perform an action/permission on an object
@@ -120,29 +127,7 @@ export const canWithPath = query({
     subjectType: v.string(),
     subjectId: v.string(),
   },
-  returns: v.object({
-    allowed: v.boolean(),
-    reason: v.string(),
-    matchedRule: v.optional(v.string()),
-    path: v.optional(v.array(v.object({
-      nodeType: v.string(),
-      nodeId: v.string(),
-      relation: v.optional(v.string()),
-      permission: v.optional(v.string()),
-      depth: v.number()
-    }))),
-    triedPaths: v.optional(v.array(v.object({
-      rulePart: v.string(),
-      failureReason: v.string(),
-      partialPath: v.optional(v.array(v.object({
-        nodeType: v.string(),
-        nodeId: v.string(),
-        relation: v.optional(v.string()),
-        permission: v.optional(v.string()),
-        depth: v.number()
-      })))
-    })))
-  }),
+  returns: pathResultValidator,
   handler: async (ctx, args) => {
     return await canRecursiveWithPath(ctx, args, 0, [], []);
   },

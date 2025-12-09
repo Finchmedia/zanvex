@@ -379,34 +379,5 @@ export function createZanvexClient(component: ComponentApi) {
 // Re-export types for convenience
 export type { ComponentApi };
 
-/**
- * Traversal Path Tracking Types
- *
- * These types are used by canWithPath() to provide detailed information
- * about permission check paths for debugging and visualization.
- */
-
-/** Represents a node in the permission check traversal path */
-export interface TraversalNode {
-  nodeType: string;      // "user", "org", "resource", "booking"
-  nodeId: string;        // ID of the node
-  relation?: string;     // Relation used to reach this node
-  permission?: string;   // Permission checked at this node
-  depth: number;         // Depth in traversal (0 = starting point)
-}
-
-/** Represents an attempted path that failed during permission check */
-export interface TriedPath {
-  rulePart: string;           // Which DSL rule part was tried
-  failureReason: string;      // Why it failed
-  partialPath?: TraversalNode[]; // How far we got before failing
-}
-
-/** Enhanced result with full traversal path information */
-export interface PathResult {
-  allowed: boolean;
-  reason: string;               // Human-readable explanation
-  matchedRule?: string;         // DSL expression that succeeded
-  path?: TraversalNode[];       // Successful path (if allowed)
-  triedPaths?: TriedPath[];     // Failed attempts (if denied)
-}
+// Re-export traversal path types from component (single source of truth)
+export type { TraversalNode, TriedPath, PathResult } from "../component/permissions.js";
