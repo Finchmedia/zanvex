@@ -25,6 +25,7 @@
     "build:clean": "rm -rf dist *.tsbuildinfo && npm run build:codegen",
     "typecheck": "tsc --noEmit && tsc -p example && tsc -p example/convex",
     "lint": "eslint .",
+    "test": "echo 'No tests'",
     "prepublishOnly": "npm run clean && npm run build",
     "preversion": "npm run clean && npm ci && npm run build && run-p lint typecheck",
     "alpha": "npm version prerelease --preid alpha && npm publish --tag alpha && git push --follow-tags",
