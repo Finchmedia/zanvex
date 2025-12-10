@@ -1,6 +1,8 @@
 # Zanvex
 
-[![npm version](https://badge.fury.io/js/@mrfinch%2Fzanvex.svg)](https://badge.fury.io/js/@mrfinch%2Fzanvex)
+> **Experimental / Work in Progress**
+>
+> This is an exploratory project experimenting with Google Zanzibar-style authorization patterns in Convex. It is **not production-ready**, not fully tested, and the API will likely change. Use at your own risk and expect rough edges.
 
 A Google Zanzibar-inspired authorization system for Convex. Implements Relationship-Based Access Control (ReBAC) with tuple-based permissions and graph traversal.
 
@@ -73,17 +75,19 @@ Open [http://localhost:5173](http://localhost:5173)
 
 ---
 
-## Installation (Production Use)
+## Installation
 
-Install the component in your Convex app:
+> **No npm package available.**
+>
+> This component is not published to npm. To use it, clone the repository and reference it locally, or copy the relevant files into your project.
+
+If/when published, installation would look like:
 
 ```bash
 npm install @mrfinch/zanvex
 ```
 
-### Configure Your App
-
-Create or update `convex/convex.config.ts`:
+And configuration:
 
 ```ts
 // convex/convex.config.ts
@@ -292,35 +296,14 @@ example/
 
 ## Development
 
-### Run Tests
 ```bash
-npm test
-```
-
-### Type Check
-```bash
-npm run typecheck
-```
-
-### Lint
-```bash
-npm run lint
-```
-
-### Build Component
-```bash
-npm run build
-```
-
-### Publish
-```bash
-npm run alpha    # Alpha release
-npm run release  # Production release
+npm run dev      # Start dev servers (backend + frontend)
+npm run build    # Build the component
 ```
 
 ---
 
-## Component Directory Structure
+## Directory Structure
 
 ```
 .
