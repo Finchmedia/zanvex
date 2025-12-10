@@ -21,6 +21,7 @@
     "predev": "path-exists .env.local dist || (npm run build && convex dev --once)",
     "clean": "rm -rf dist *.tsbuildinfo",
     "build": "tsc --project ./tsconfig.build.json",
+    "vercel-build": "npm run build && cd example && npm install && npm run build",
     "build:codegen": "npx convex codegen --component-dir ./src/component && npm run build",
     "build:clean": "rm -rf dist *.tsbuildinfo && npm run build:codegen",
     "typecheck": "tsc --noEmit && tsc -p example && tsc -p example/convex",
